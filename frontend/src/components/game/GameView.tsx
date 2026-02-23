@@ -14,6 +14,7 @@ import { usePlayerStore } from '../../stores/playerStore';
 import { useGameStore } from '../../stores/gameStore';
 import { GameWebSocket } from '../../services/ws';
 import GameMapComponent from '../map/GameMap';
+import MapOverlayControls from '../map/MapOverlayControls';
 import GameHeader from './GameHeader';
 import ScoreBoard from './ScoreBoard';
 
@@ -41,6 +42,8 @@ export default function GameView() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+  const [terrain3d, setTerrain3d] = useState(false);
+  const [slopeShading, setSlopeShading] = useState(false);
 
   // Reset game store when entering a new session
   useEffect(() => {
@@ -376,7 +379,13 @@ export default function GameView() {
       />
 
       <div className="flex-1 relative">
-        <GameMapComponent onMapReady={initDraw} />
+        <GameMapComponent onMapReady={initDraw} terrain3d={terrain3d} slopeShading={slopeShading} />
+        <MapOverlayControls
+          terrain3d={terrain3d}
+          slopeShading={slopeShading}
+          onToggleTerrain={() => setTerrain3d((v) => !v)}
+          onToggleSlope={() => setSlopeShading((v) => !v)}
+        />
 
         {/* Submit button */}
         {phase === 'playing' && !submitted && (

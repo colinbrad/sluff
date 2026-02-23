@@ -13,6 +13,7 @@ import type { GameMap, Round } from '../../types/game';
 type FeatureId = string | number;
 import * as api from '../../services/api';
 import GameMapComponent from '../map/GameMap';
+import MapOverlayControls from '../map/MapOverlayControls';
 
 type Step = 'idle' | 'start' | 'end' | 'corridor' | 'review';
 
@@ -33,6 +34,8 @@ export default function MapEditor() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [placed, setPlaced] = useState({ start: false, end: false, corridor: false });
+  const [terrain3d, setTerrain3d] = useState(false);
+  const [slopeShading, setSlopeShading] = useState(false);
 
   const mapRef = useRef<maplibregl.Map | null>(null);
   const drawRef = useRef<TerraDraw | null>(null);
@@ -591,7 +594,13 @@ export default function MapEditor() {
 
         {/* Map */}
         <div className="flex-1 relative">
-          <GameMapComponent onMapReady={initDraw} />
+          <GameMapComponent onMapReady={initDraw} terrain3d={terrain3d} slopeShading={slopeShading} />
+          <MapOverlayControls
+            terrain3d={terrain3d}
+            slopeShading={slopeShading}
+            onToggleTerrain={() => setTerrain3d((v) => !v)}
+            onToggleSlope={() => setSlopeShading((v) => !v)}
+          />
         </div>
       </div>
     </div>
