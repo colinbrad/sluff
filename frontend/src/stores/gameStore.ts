@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Session, Round, ScoreDetails, GamePhase } from '../types/game';
+import type { Session, Round, ScoreDetails, GamePhase, TeamRoute } from '../types/game';
 
 interface Cursor {
   playerId: string;
@@ -15,6 +15,7 @@ interface GameState {
   teamCursors: Map<string, Cursor>;
   teamDrawing: GeoJSON.LineString | null;
   teamScores: Array<{ team_id: string; score: ScoreDetails }>;
+  routeResults: TeamRoute[];
 
   setSession: (session: Session | null) => void;
   setCurrentRound: (round: Round | null) => void;
@@ -23,6 +24,7 @@ interface GameState {
   updateCursor: (playerId: string, lat: number, lng: number) => void;
   setTeamDrawing: (path: GeoJSON.LineString | null) => void;
   setTeamScores: (scores: Array<{ team_id: string; score: ScoreDetails }>) => void;
+  setRouteResults: (routes: TeamRoute[]) => void;
   reset: () => void;
 }
 
@@ -34,6 +36,7 @@ export const useGameStore = create<GameState>((set) => ({
   teamCursors: new Map(),
   teamDrawing: null,
   teamScores: [],
+  routeResults: [],
 
   setSession: (session) => set({ session }),
   setCurrentRound: (round) => set({ currentRound: round }),
@@ -47,6 +50,7 @@ export const useGameStore = create<GameState>((set) => ({
     }),
   setTeamDrawing: (path) => set({ teamDrawing: path }),
   setTeamScores: (scores) => set({ teamScores: scores }),
+  setRouteResults: (routes) => set({ routeResults: routes }),
   reset: () =>
     set({
       session: null,
@@ -56,5 +60,6 @@ export const useGameStore = create<GameState>((set) => ({
       teamCursors: new Map(),
       teamDrawing: null,
       teamScores: [],
+      routeResults: [],
     }),
 }));

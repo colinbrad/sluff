@@ -16,7 +16,7 @@ import { GameWebSocket } from '../../services/ws';
 import GameMapComponent from '../map/GameMap';
 import MapOverlayControls from '../map/MapOverlayControls';
 import GameHeader from './GameHeader';
-import ScoreBoard from './ScoreBoard';
+import RoundReview from './RoundReview';
 
 export default function GameView() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -28,6 +28,7 @@ export default function GameView() {
     phase,
     timeRemaining,
     teamScores,
+    routeResults,
     setSession,
     setCurrentRound,
     setPhase,
@@ -35,6 +36,7 @@ export default function GameView() {
     updateCursor,
     setTeamDrawing,
     setTeamScores,
+    setRouteResults,
     reset,
   } = useGameStore();
 
@@ -120,6 +122,12 @@ export default function GameView() {
         case 'scores': {
           const scores = msg.payload as ScoresPayload;
           setTeamScores(scores.team_scores);
+          // Fetch full route data (with paths) for map display
+          if (sessionId && currentRound?.id) {
+            api.getScores(sessionId, currentRound.id).then((routes) => {
+              setRouteResults(routes);
+            });
+          }
           setShowScores(true);
           break;
         }
@@ -279,6 +287,7 @@ export default function GameView() {
       // Solo: immediately fetch and show scores
       if (isSolo) {
         const scores = await api.getScores(sessionId, currentRound.id);
+        setRouteResults(scores);
         const mappedScores = scores.map((r) => ({
           team_id: r.team_id,
           score: r.details!,
@@ -317,6 +326,7 @@ export default function GameView() {
           setTimeRemaining(updated.time_limit_sec);
           setShowScores(false);
           setSubmitted(false);
+          setRouteResults([]);
           // Clear previous drawing
           const draw = drawRef.current;
           if (draw) {
@@ -353,10 +363,12 @@ export default function GameView() {
 
   if (showScores && teamScores.length > 0) {
     return (
-      <ScoreBoard
+      <RoundReview
         teamScores={teamScores}
+        routeResults={routeResults}
         teams={session?.teams || []}
-        onContinue={handleScoreContinue}
+        currentRound={currentRound}
+        onNextRound={handleScoreContinue}
       />
     );
   }

@@ -235,7 +235,8 @@ func (h *AdminHandler) CreateRound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, round)
+	// Return GeoJSON format for frontend consistency
+	writeJSON(w, http.StatusCreated, roundToGeoJSON(round))
 }
 
 func (h *AdminHandler) UpdateRound(w http.ResponseWriter, r *http.Request) {
@@ -299,7 +300,8 @@ func (h *AdminHandler) UpdateRound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, existing)
+	// Return GeoJSON format for frontend consistency
+	writeJSON(w, http.StatusOK, roundToGeoJSON(existing))
 }
 
 func (h *AdminHandler) DeleteRound(w http.ResponseWriter, r *http.Request) {
@@ -312,6 +314,40 @@ func (h *AdminHandler) DeleteRound(w http.ResponseWriter, r *http.Request) {
 }
 
 // helpers
+
+// roundToGeoJSON converts a Round with orb types to a map with GeoJSON geometry
+func roundToGeoJSON(round *model.Round) map[string]interface{} {
+	startGeo := map[string]interface{}{
+		"type":        "Point",
+		"coordinates": []float64{round.StartPoint[0], round.StartPoint[1]},
+	}
+	endGeo := map[string]interface{}{
+		"type":        "Point",
+		"coordinates": []float64{round.EndPoint[0], round.EndPoint[1]},
+	}
+	polyCoords := make([][][]float64, len(round.Corridor))
+	for j, ring := range round.Corridor {
+		ringCoords := make([][]float64, len(ring))
+		for k, pt := range ring {
+			ringCoords[k] = []float64{pt[0], pt[1]}
+		}
+		polyCoords[j] = ringCoords
+	}
+	corridorGeo := map[string]interface{}{
+		"type":        "Polygon",
+		"coordinates": polyCoords,
+	}
+
+	return map[string]interface{}{
+		"id":           round.ID,
+		"map_id":       round.MapID,
+		"round_number": round.RoundNumber,
+		"name":         round.Name,
+		"start_point":  startGeo,
+		"end_point":    endGeo,
+		"corridor":     corridorGeo,
+	}
+}
 
 func toGeoJSONPoint(p orb.Point) string {
 	b, _ := json.Marshal(map[string]interface{}{
