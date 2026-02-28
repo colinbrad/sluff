@@ -346,9 +346,9 @@ export default function GameView() {
   // Game over screen
   if (phase === 'finished') {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-white mb-4">Game Over</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-4">Game Over</h1>
           <p className="text-gray-400 mb-8">Thanks for playing!</p>
           <button
             onClick={() => navigate('/')}
@@ -401,11 +401,11 @@ export default function GameView() {
 
         {/* Submit button */}
         {phase === 'playing' && !submitted && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
+          <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-10 w-full px-4 sm:w-auto sm:px-0">
             <button
               onClick={handleSubmit}
               disabled={submitting}
-              className="px-8 py-3 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 disabled:opacity-50 font-semibold text-lg transition-colors"
+              className="w-full sm:w-auto px-8 py-3 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 disabled:opacity-50 font-semibold text-base sm:text-lg transition-colors"
             >
               {submitting ? 'Submitting...' : 'Submit Route'}
             </button>
@@ -413,9 +413,9 @@ export default function GameView() {
         )}
 
         {submitted && phase === 'playing' && !isSolo && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
-            <div className="px-6 py-3 bg-white rounded-lg shadow-lg text-green-600 font-semibold">
-              Route Submitted! Waiting for other teams...
+          <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-10">
+            <div className="px-4 sm:px-6 py-3 bg-white rounded-lg shadow-lg text-green-600 font-semibold text-sm sm:text-base text-center">
+              Submitted! Waiting for other teams...
             </div>
           </div>
         )}

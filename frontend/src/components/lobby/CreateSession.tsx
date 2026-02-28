@@ -33,7 +33,8 @@ export default function CreateSession() {
   }
 
   return (
-    <div className="max-w-md mx-auto bg-white rounded-lg shadow p-6">
+    <div className="min-h-screen bg-gray-50 flex items-start sm:items-center justify-center p-4">
+    <div className="max-w-md w-full bg-white rounded-lg shadow p-4 sm:p-6">
       <h2 className="text-xl font-bold mb-4">Create Game Session</h2>
 
       {maps.length === 0 ? (
@@ -82,6 +83,7 @@ export default function CreateSession() {
           </button>
         </>
       )}
+    </div>
     </div>
   );
 }

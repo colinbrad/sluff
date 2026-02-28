@@ -89,8 +89,8 @@ export default function WaitingRoom() {
   // Not yet joined
   if (!player) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md w-full bg-white rounded-lg shadow p-6">
+      <div className="min-h-screen bg-gray-50 flex items-start sm:items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow p-4 sm:p-6">
           <h2 className="text-xl font-bold mb-2">Join Game</h2>
           <p className="text-sm text-gray-500 mb-4">
             Code: <span className="font-mono font-bold">{session.code}</span>
@@ -124,23 +124,23 @@ export default function WaitingRoom() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 py-3 sm:py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold">Waiting Room</h1>
+            <h1 className="text-lg sm:text-xl font-bold">Waiting Room</h1>
             <p className="text-sm text-gray-500">
-              Share code:{' '}
-              <span className="font-mono font-bold text-lg text-blue-600">
+              Code:{' '}
+              <span className="font-mono font-bold text-base sm:text-lg text-blue-600">
                 {session.code}
               </span>
             </p>
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-xs sm:text-sm text-gray-500">
             {session.players?.length || 0}/8 players
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-4xl mx-auto px-4 py-4 sm:py-8">
         {/* Teams */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">

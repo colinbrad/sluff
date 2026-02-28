@@ -15,6 +15,20 @@ import * as api from '../../services/api';
 import GameMapComponent from '../map/GameMap';
 import MapOverlayControls from '../map/MapOverlayControls';
 
+function useMobileBreakpoint(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < breakpoint : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    setIsMobile(mq.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 type Step = 'idle' | 'start' | 'end' | 'corridor' | 'review';
 
 const STEP_INFO: Record<Exclude<Step, 'idle'>, { label: string; number: number; instruction: string }> = {
@@ -36,6 +50,8 @@ export default function MapEditor() {
   const [placed, setPlaced] = useState({ start: false, end: false, corridor: false });
   const [terrain3d, setTerrain3d] = useState(false);
   const [slopeShading, setSlopeShading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const isMobile = useMobileBreakpoint();
 
   const mapRef = useRef<maplibregl.Map | null>(null);
   const drawRef = useRef<TerraDraw | null>(null);
@@ -339,6 +355,7 @@ export default function MapEditor() {
     setEditingRound(null);
     setRoundName('');
     setStep('start');
+    if (isMobile) setSidebarOpen(false);
   };
 
   const editRound = (round: Round) => {
@@ -396,8 +413,8 @@ export default function MapEditor() {
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b px-4 py-3 flex items-center justify-between z-10">
-        <div className="flex items-center gap-4">
+      <header className="bg-white shadow-sm border-b px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between z-10">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <button
             onClick={() => {
               if (isEditing) {
@@ -406,22 +423,38 @@ export default function MapEditor() {
                 navigate('/admin');
               }
             }}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 hover:text-gray-700 shrink-0"
           >
             &larr; {isEditing ? 'Cancel' : 'Back'}
           </button>
-          <h1 className="text-lg font-bold">{gameMap.name}</h1>
+          <h1 className="text-base sm:text-lg font-bold truncate">{gameMap.name}</h1>
         </div>
-        {isEditing && (
-          <span className="text-sm text-gray-600">
-            {editingRound !== null ? `Editing Round ${editingRound}` : 'New Round'}
-          </span>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {isEditing && (
+            <span className="text-xs sm:text-sm text-gray-600 hidden sm:inline">
+              {editingRound !== null ? `Editing Round ${editingRound}` : 'New Round'}
+            </span>
+          )}
+          {isMobile && (
+            <button
+              onClick={() => setSidebarOpen((v) => !v)}
+              className="px-2.5 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200"
+            >
+              {sidebarOpen ? 'Map' : 'Panel'}
+            </button>
+          )}
+        </div>
       </header>
 
-      <div className="flex-1 flex">
-        {/* Sidebar */}
-        <div className="w-72 bg-white border-r overflow-y-auto p-4 flex flex-col gap-4 z-10">
+      <div className="flex-1 flex flex-col md:flex-row min-h-0">
+        {/* Sidebar - full width sheet on mobile, fixed sidebar on desktop */}
+        <div className={`${
+          isMobile
+            ? sidebarOpen ? 'flex' : 'hidden'
+            : 'flex'
+        } md:w-72 bg-white border-b md:border-b-0 md:border-r overflow-y-auto p-4 flex-col gap-4 z-10 ${
+          isMobile && sidebarOpen ? 'flex-1' : ''
+        }`}>
           {isEditing ? (
             <>
               {/* Step progress */}
@@ -562,20 +595,24 @@ export default function MapEditor() {
                               );
                               mapRef.current?.fitBounds(bounds, { padding: 80 });
                             }
+                            if (isMobile) setSidebarOpen(false);
                           }}
-                          className="text-gray-600 hover:text-gray-800 text-xs"
+                          className="text-gray-600 hover:text-gray-800 text-xs py-1"
                         >
                           View
                         </button>
                         <button
-                          onClick={() => editRound(round)}
-                          className="text-blue-600 hover:text-blue-800 text-xs"
+                          onClick={() => {
+                            editRound(round);
+                            if (isMobile) setSidebarOpen(false);
+                          }}
+                          className="text-blue-600 hover:text-blue-800 text-xs py-1"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => deleteRound(round)}
-                          className="text-red-600 hover:text-red-800 text-xs"
+                          className="text-red-600 hover:text-red-800 text-xs py-1"
                         >
                           Delete
                         </button>
@@ -593,7 +630,7 @@ export default function MapEditor() {
         </div>
 
         {/* Map */}
-        <div className="flex-1 relative">
+        <div className={`flex-1 relative ${isMobile && sidebarOpen ? 'hidden' : ''}`}>
           <GameMapComponent onMapReady={initDraw} terrain3d={terrain3d} slopeShading={slopeShading} />
           <MapOverlayControls
             terrain3d={terrain3d}

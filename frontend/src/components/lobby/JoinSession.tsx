@@ -36,7 +36,8 @@ export default function JoinSession() {
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white rounded-lg shadow p-6">
+    <div className="min-h-screen bg-gray-50 flex items-start sm:items-center justify-center p-4">
+    <div className="max-w-md w-full bg-white rounded-lg shadow p-4 sm:p-6">
       <h2 className="text-xl font-bold mb-4">Join Game</h2>
 
       {error && (
@@ -57,7 +58,7 @@ export default function JoinSession() {
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="ABCD12"
               maxLength={6}
-              className="w-full px-4 py-3 border rounded-lg text-center text-2xl tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 border rounded-lg text-center text-xl sm:text-2xl tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <button
@@ -93,6 +94,7 @@ export default function JoinSession() {
           </button>
         </>
       )}
+    </div>
     </div>
   );
 }

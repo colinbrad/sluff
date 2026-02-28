@@ -22,26 +22,28 @@ export default function GameHeader({
   const isLow = timeRemaining <= 30;
 
   return (
-    <header className="bg-white shadow-sm border-b px-4 py-3 flex items-center justify-between z-10">
-      <div className="flex items-center gap-4">
+    <header className="bg-white shadow-sm border-b px-2 py-2 sm:px-4 sm:py-3 flex items-center justify-between z-10 gap-2">
+      <div className="flex items-center gap-2 sm:gap-4 min-w-0">
         <button
           onClick={onExit}
-          className="text-gray-500 hover:text-gray-700 text-sm"
+          className="text-gray-500 hover:text-gray-700 text-sm shrink-0 py-1"
         >
-          &larr; Exit
+          &larr; <span className="hidden sm:inline">Exit</span>
         </button>
-        <div>
-          <span className="text-sm text-gray-500">Round {roundNumber}</span>
+        <div className="min-w-0">
+          <span className="text-xs sm:text-sm text-gray-500">Rd {roundNumber}</span>
           {roundName && (
-            <span className="text-sm text-gray-400 ml-2">{roundName}</span>
+            <span className="text-xs sm:text-sm text-gray-400 ml-1 sm:ml-2 truncate">
+              {roundName}
+            </span>
           )}
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
         {phase === 'playing' && (
           <div
-            className={`font-mono text-2xl font-bold ${
+            className={`font-mono text-lg sm:text-2xl font-bold ${
               isLow ? 'text-red-600 animate-pulse' : 'text-gray-900'
             }`}
           >
@@ -50,17 +52,17 @@ export default function GameHeader({
         )}
 
         {submitted && (
-          <span className="text-sm text-green-600 font-medium">Submitted</span>
+          <span className="text-xs sm:text-sm text-green-600 font-medium">Submitted</span>
         )}
 
         {phase === 'waiting' && (
-          <span className="text-sm text-gray-500">Waiting to start...</span>
+          <span className="text-xs sm:text-sm text-gray-500">Waiting...</span>
         )}
         {phase === 'scoring' && (
-          <span className="text-sm text-blue-600 font-medium">Scoring...</span>
+          <span className="text-xs sm:text-sm text-blue-600 font-medium">Scoring...</span>
         )}
         {phase === 'finished' && (
-          <span className="text-sm text-purple-600 font-medium">
+          <span className="text-xs sm:text-sm text-purple-600 font-medium">
             Game Over
           </span>
         )}

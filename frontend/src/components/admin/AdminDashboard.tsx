@@ -40,21 +40,21 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Sluff Admin</h1>
+        <div className="max-w-4xl mx-auto px-4 py-3 sm:py-4 flex items-center justify-between">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Sluff Admin</h1>
           <button
             onClick={() => navigate('/')}
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="text-sm text-gray-500 hover:text-gray-700 py-1"
           >
             Back to Home
           </button>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-lg font-semibold mb-4">Create New Map</h2>
-          <div className="flex gap-3">
+      <main className="max-w-4xl mx-auto px-4 py-4 sm:py-8">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-6 sm:mb-8">
+          <h2 className="text-lg font-semibold mb-3 sm:mb-4">Create New Map</h2>
+          <div className="flex flex-col sm:flex-row gap-3">
             <input
               type="text"
               placeholder="Map name (e.g., Wasatch Backcountry)"
@@ -65,7 +65,7 @@ export default function AdminDashboard() {
             />
             <button
               onClick={handleCreate}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shrink-0"
             >
               Create
             </button>
@@ -76,29 +76,29 @@ export default function AdminDashboard() {
         {maps.length === 0 ? (
           <p className="text-gray-500">No maps yet. Create one above.</p>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid gap-3 sm:gap-4">
             {maps.map((m) => (
               <div
                 key={m.id}
-                className="bg-white rounded-lg shadow p-4 flex items-center justify-between"
+                className="bg-white rounded-lg shadow p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
               >
-                <div>
-                  <h3 className="font-medium text-gray-900">{m.name}</h3>
+                <div className="min-w-0">
+                  <h3 className="font-medium text-gray-900 truncate">{m.name}</h3>
                   <p className="text-sm text-gray-500">
                     {m.rounds?.length || 0} round(s) &middot; Created{' '}
                     {new Date(m.created_at).toLocaleDateString()}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 shrink-0">
                   <button
                     onClick={() => navigate(`/admin/maps/${m.id}`)}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                    className="flex-1 sm:flex-none px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => handleDelete(m.id)}
-                    className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                    className="flex-1 sm:flex-none px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors text-sm"
                   >
                     Delete
                   </button>

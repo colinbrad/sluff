@@ -177,37 +177,37 @@ export default function RoundReview({
   return (
     <div className="h-screen flex flex-col bg-gray-900">
       {/* Header */}
-      <div className="px-4 py-3 bg-gray-800 border-b border-gray-700 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-white">Round Results</h1>
+      <div className="px-3 py-2 sm:px-4 sm:py-3 bg-gray-800 border-b border-gray-700 flex items-center justify-between">
+        <h1 className="text-lg sm:text-xl font-bold text-white">Round Results</h1>
         <button
           onClick={onNextRound}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-colors"
+          className="px-4 py-2 sm:px-6 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-colors text-sm sm:text-base"
         >
           Next Round
         </button>
       </div>
 
-      {/* Main content: map + score panel */}
-      <div className="flex-1 flex min-h-0">
+      {/* Main content: stacked on mobile, side-by-side on desktop */}
+      <div className="flex-1 flex flex-col md:flex-row min-h-0">
         {/* Map */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative min-h-[40vh] md:min-h-0">
           <div ref={mapContainerRef} className="w-full h-full" />
 
           {/* Route legend overlay */}
-          <div className="absolute bottom-4 left-4 bg-gray-900/90 backdrop-blur-sm rounded-lg p-3 space-y-1.5">
+          <div className="absolute bottom-2 left-2 sm:bottom-4 sm:left-4 bg-gray-900/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 space-y-1 sm:space-y-1.5">
             {sorted.map((entry, index) => {
               const team = getTeam(entry.team_id);
               const color = getTeamColor(entry.team_id, index);
               return (
                 <div key={entry.team_id} className="flex items-center gap-2">
                   <div
-                    className="w-6 h-1 rounded-full"
+                    className="w-5 sm:w-6 h-1 rounded-full shrink-0"
                     style={{ backgroundColor: color }}
                   />
-                  <span className="text-white text-sm">
+                  <span className="text-white text-xs sm:text-sm">
                     {team?.name || 'Unknown'}
                   </span>
-                  <span className="text-gray-400 text-sm">
+                  <span className="text-gray-400 text-xs sm:text-sm">
                     {Math.round(entry.score.final_score)}pts
                   </span>
                 </div>
@@ -216,8 +216,8 @@ export default function RoundReview({
           </div>
         </div>
 
-        {/* Score panel */}
-        <div className="w-96 bg-gray-900 border-l border-gray-700 overflow-y-auto p-4">
+        {/* Score panel - scrollable below map on mobile, side panel on desktop */}
+        <div className="md:w-96 bg-gray-900 border-t md:border-t-0 md:border-l border-gray-700 overflow-y-auto p-3 sm:p-4">
           <div className="space-y-3">
             {sorted.map((entry, index) => {
               const team = getTeam(entry.team_id);
@@ -225,12 +225,12 @@ export default function RoundReview({
               return (
                 <div
                   key={entry.team_id}
-                  className="bg-gray-800 rounded-lg p-4"
+                  className="bg-gray-800 rounded-lg p-3 sm:p-4"
                 >
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between mb-2 sm:mb-3">
                     <div className="flex items-center gap-2">
                       <span
-                        className={`text-2xl font-bold ${
+                        className={`text-xl sm:text-2xl font-bold ${
                           index === 0
                             ? 'text-yellow-400'
                             : index === 1
@@ -241,22 +241,22 @@ export default function RoundReview({
                         #{index + 1}
                       </span>
                       <div
-                        className="w-3 h-3 rounded-full"
+                        className="w-3 h-3 rounded-full shrink-0"
                         style={{ backgroundColor: color }}
                       />
-                      <span className="text-white font-semibold">
+                      <span className="text-white font-semibold text-sm sm:text-base">
                         {team?.name || 'Unknown'}
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-2xl font-bold text-white">
+                      <span className="text-xl sm:text-2xl font-bold text-white">
                         {Math.round(entry.score.final_score)}
                       </span>
-                      <span className="text-gray-400 text-sm"> / 1000</span>
+                      <span className="text-gray-400 text-xs sm:text-sm"> / 1000</span>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3 text-sm">
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3 text-xs sm:text-sm">
                     <div>
                       <span className="text-gray-400">In corridor</span>
                       <div className="text-white font-medium">
@@ -293,6 +293,14 @@ export default function RoundReview({
               );
             })}
           </div>
+
+          {/* Mobile-only bottom button (easier to reach than header) */}
+          <button
+            onClick={onNextRound}
+            className="md:hidden w-full mt-4 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-colors"
+          >
+            Next Round
+          </button>
         </div>
       </div>
     </div>
