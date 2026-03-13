@@ -58,6 +58,9 @@ function lineToRound(coords: number[][], name: string): ImportedRound {
     geometry: { type: 'LineString', coordinates: coords },
   };
   const buffered = buffer(line, 0.05, { units: 'kilometers' });
+  if (!buffered) {
+    throw new Error(`Failed to buffer line "${name}"`);
+  }
   return {
     name,
     start_point: { type: 'Point', coordinates: [start[0], start[1]] },
