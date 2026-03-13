@@ -21,11 +21,20 @@ FROM debian:bookworm-slim AS runtime
 
 WORKDIR /app
 
-# Install ca-certificates and curl for health checks
+# Install ca-certificates, curl, and Litestream
 RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
+
+# Install Litestream
+RUN curl -fsSL https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-amd64.deb -o /tmp/litestream.deb && \
+    dpkg -i /tmp/litestream.deb && \
+    rm /tmp/litestream.deb
 
 # Copy binary from builder
 COPY --from=builder /sluff-server /app/sluff-server
+
+# Copy Litestream config and entrypoint
+COPY litestream.yml /app/litestream.yml
+COPY entrypoint.sh /app/entrypoint.sh
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data
@@ -41,4 +50,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 EXPOSE 8080
 
-CMD ["/app/sluff-server"]
+CMD ["/app/entrypoint.sh"]

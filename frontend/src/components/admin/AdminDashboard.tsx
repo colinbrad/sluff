@@ -1,12 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { GameMap } from '../../types/game';
 import * as api from '../../services/api';
+import { parseFile, extractRounds } from '../../utils/importGeo';
 
 export default function AdminDashboard() {
   const [maps, setMaps] = useState<GameMap[]>([]);
   const [newName, setNewName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,6 +31,47 @@ export default function AdminDashboard() {
   const handleDelete = async (id: string) => {
     await api.deleteMap(id);
     setMaps(maps.filter((m) => m.id !== id));
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    setImportError('');
+
+    try {
+      const fc = await parseFile(file);
+      const rounds = extractRounds(fc);
+
+      if (rounds.length === 0) {
+        setImportError('No usable routes found in file. Import supports LineString, MultiLineString, and Polygon geometries.');
+        setImporting(false);
+        return;
+      }
+
+      const mapName = file.name.replace(/\.(kml|gpx|geojson|json)$/i, '');
+      const m = await api.createMap(mapName, `Imported from ${file.name}`);
+
+      for (let i = 0; i < rounds.length; i++) {
+        const r = rounds[i];
+        await api.createRound(m.id, {
+          round_number: i + 1,
+          name: r.name,
+          start_point: r.start_point,
+          end_point: r.end_point,
+          corridor: r.corridor,
+        });
+      }
+
+      setMaps([m, ...maps]);
+      navigate(`/admin/maps/${m.id}`);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Failed to import file');
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   if (loading) {
@@ -69,6 +114,28 @@ export default function AdminDashboard() {
             >
               Create
             </button>
+          </div>
+
+          <div className="mt-4 pt-4 border-t">
+            <p className="text-sm text-gray-500 mb-2">Or import from a file:</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".kml,.gpx,.geojson,.json"
+              onChange={handleImport}
+              disabled={importing}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm disabled:opacity-50"
+            >
+              {importing ? 'Importing...' : 'Import KML / GPX / GeoJSON'}
+            </button>
+            {importError && (
+              <p className="mt-2 text-sm text-red-600">{importError}</p>
+            )}
           </div>
         </div>
 

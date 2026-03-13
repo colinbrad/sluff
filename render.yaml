@@ -14,6 +14,14 @@ services:
         value: /app/data/sluff.db
       - key: CORS_ORIGINS
         sync: false
+      - key: LITESTREAM_ENDPOINT
+        sync: false
+      - key: LITESTREAM_BUCKET
+        sync: false
+      - key: LITESTREAM_ACCESS_KEY_ID
+        sync: false
+      - key: LITESTREAM_SECRET_ACCESS_KEY
+        sync: false
 
   - type: web
     name: sluff-frontend

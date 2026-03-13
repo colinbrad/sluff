@@ -11,8 +11,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@mapbox/togeojson": "^0.16.2",
     "@turf/along": "^7.3.4",
     "@turf/boolean-point-in-polygon": "^7.3.4",
+    "@turf/buffer": "^7.3.4",
     "@turf/helpers": "^7.3.4",
     "@turf/length": "^7.3.4",
     "maplibre-gl": "^5.17.0",

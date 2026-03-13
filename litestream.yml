@@ -1,0 +1,10 @@
+dbs:
+  - path: /app/data/sluff.db
+    replicas:
+      - type: s3
+        endpoint: $LITESTREAM_ENDPOINT
+        bucket: $LITESTREAM_BUCKET
+        path: sluff.db
+        access-key-id: $LITESTREAM_ACCESS_KEY_ID
+        secret-access-key: $LITESTREAM_SECRET_ACCESS_KEY
+        force-path-style: true
