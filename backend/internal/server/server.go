@@ -50,7 +50,7 @@ func (s *Server) setupMiddleware() {
 }
 
 func (s *Server) setupRoutes() {
-	adminH := handler.NewAdminHandler(s.store)
+	guideH := handler.NewGuideHandler(s.store)
 	sessionH := handler.NewSessionHandler(s.store)
 	gameH := handler.NewGameHandler(s.store, s.hub)
 	wsH := handler.NewWSHandler(s.store, s.hub)
@@ -60,20 +60,20 @@ func (s *Server) setupRoutes() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// Admin endpoints
-	s.router.Route("/api/admin/maps", func(r chi.Router) {
-		r.Post("/", adminH.CreateMap)
-		r.Get("/", adminH.ListMaps)
-		r.Get("/{mapID}", adminH.GetMap)
-		r.Put("/{mapID}", adminH.UpdateMap)
-		r.Delete("/{mapID}", adminH.DeleteMap)
-		r.Post("/{mapID}/rounds", adminH.CreateRound)
-		r.Put("/{mapID}/rounds/{roundID}", adminH.UpdateRound)
-		r.Delete("/{mapID}/rounds/{roundID}", adminH.DeleteRound)
+	// Guide endpoints
+	s.router.Route("/api/guide/maps", func(r chi.Router) {
+		r.Post("/", guideH.CreateMap)
+		r.Get("/", guideH.ListMaps)
+		r.Get("/{mapID}", guideH.GetMap)
+		r.Put("/{mapID}", guideH.UpdateMap)
+		r.Delete("/{mapID}", guideH.DeleteMap)
+		r.Post("/{mapID}/rounds", guideH.CreateRound)
+		r.Put("/{mapID}/rounds/{roundID}", guideH.UpdateRound)
+		r.Delete("/{mapID}/rounds/{roundID}", guideH.DeleteRound)
 	})
 
 	// Player-facing map listing
-	s.router.Get("/api/maps", adminH.ListMaps)
+	s.router.Get("/api/maps", guideH.ListMaps)
 
 	// Session endpoints
 	s.router.Route("/api/sessions", func(r chi.Router) {

@@ -31,14 +31,14 @@ describe('API client', () => {
   });
 
   describe('listMaps', () => {
-    it('fetches maps from /api/admin/maps', async () => {
+    it('fetches maps from /api/guide/maps', async () => {
       const maps = [{ id: 'm1', name: 'Test Map' }];
       mockFetch.mockReturnValueOnce(jsonResponse(maps));
 
       const result = await api.listMaps();
       expect(result).toEqual(maps);
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/admin/maps',
+        '/api/guide/maps',
         expect.objectContaining({ headers: { 'Content-Type': 'application/json' } })
       );
     });
@@ -52,7 +52,7 @@ describe('API client', () => {
       const result = await api.createMap('New Map', 'Desc');
       expect(result).toEqual(map);
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/admin/maps',
+        '/api/guide/maps',
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({ name: 'New Map', description: 'Desc' }),
@@ -68,7 +68,7 @@ describe('API client', () => {
 
       const result = await api.getMap('m1');
       expect(result).toEqual(map);
-      expect(mockFetch).toHaveBeenCalledWith('/api/admin/maps/m1', expect.anything());
+      expect(mockFetch).toHaveBeenCalledWith('/api/guide/maps/m1', expect.anything());
     });
   });
 
@@ -84,7 +84,7 @@ describe('API client', () => {
       const result = await api.deleteMap('m1');
       expect(result).toBeUndefined();
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/admin/maps/m1',
+        '/api/guide/maps/m1',
         expect.objectContaining({ method: 'DELETE' })
       );
     });
@@ -104,7 +104,7 @@ describe('API client', () => {
       const result = await api.createRound('m1', roundData);
       expect(result.id).toBe('r1');
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/admin/maps/m1/rounds',
+        '/api/guide/maps/m1/rounds',
         expect.objectContaining({ method: 'POST' })
       );
     });

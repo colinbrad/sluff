@@ -41,7 +41,7 @@ make build
 
 ## How It Works
 
-1. **Admin** creates maps with rounds (start/end points + corridor of correctness) at `/admin`
+1. **Guide** creates maps with rounds (start/end points + corridor of correctness) at `/guide`
 2. **Host** creates a game session from a map, gets a 6-character join code
 3. **Players** join via code, form teams (2-4 teams, 2-8 players total)
 4. **Each round**: Teams collaboratively draw a ski route on the topo map

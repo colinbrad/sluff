@@ -33,7 +33,7 @@ describe('Home page', () => {
     expect(screen.getByText('Solo Play')).toBeInTheDocument();
     expect(screen.getByText('Join Game')).toBeInTheDocument();
     expect(screen.getByText('Create Session')).toBeInTheDocument();
-    expect(screen.getByText('Admin Panel')).toBeInTheDocument();
+    expect(screen.getByText('Guide Panel')).toBeInTheDocument();
   });
 
   it('renders all buttons as clickable', () => {

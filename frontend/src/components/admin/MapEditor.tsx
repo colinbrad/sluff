@@ -420,7 +420,7 @@ export default function MapEditor() {
               if (isEditing) {
                 cancelEditing();
               } else {
-                navigate('/admin');
+                navigate('/guide');
               }
             }}
             className="text-gray-500 hover:text-gray-700 shrink-0"

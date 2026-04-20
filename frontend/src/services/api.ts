@@ -18,27 +18,27 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
-// Admin - Maps
+// Guide - Maps
 export const createMap = (name: string, description: string) =>
-  request<GameMap>('/admin/maps', {
+  request<GameMap>('/guide/maps', {
     method: 'POST',
     body: JSON.stringify({ name, description }),
   });
 
-export const listMaps = () => request<GameMap[]>('/admin/maps');
+export const listMaps = () => request<GameMap[]>('/guide/maps');
 
-export const getMap = (id: string) => request<GameMap>(`/admin/maps/${id}`);
+export const getMap = (id: string) => request<GameMap>(`/guide/maps/${id}`);
 
 export const updateMap = (id: string, data: { name?: string; description?: string }) =>
-  request<GameMap>(`/admin/maps/${id}`, {
+  request<GameMap>(`/guide/maps/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
 
 export const deleteMap = (id: string) =>
-  request<void>(`/admin/maps/${id}`, { method: 'DELETE' });
+  request<void>(`/guide/maps/${id}`, { method: 'DELETE' });
 
-// Admin - Rounds
+// Guide - Rounds
 export const createRound = (mapId: string, data: {
   round_number: number;
   name: string;
@@ -46,7 +46,7 @@ export const createRound = (mapId: string, data: {
   end_point: GeoJSON.Geometry;
   corridor: GeoJSON.Geometry;
 }) =>
-  request<Round>(`/admin/maps/${mapId}/rounds`, {
+  request<Round>(`/guide/maps/${mapId}/rounds`, {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -58,13 +58,13 @@ export const updateRound = (mapId: string, roundId: string, data: Partial<{
   end_point: GeoJSON.Geometry;
   corridor: GeoJSON.Geometry;
 }>) =>
-  request<Round>(`/admin/maps/${mapId}/rounds/${roundId}`, {
+  request<Round>(`/guide/maps/${mapId}/rounds/${roundId}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
 
 export const deleteRound = (mapId: string, roundId: string) =>
-  request<void>(`/admin/maps/${mapId}/rounds/${roundId}`, { method: 'DELETE' });
+  request<void>(`/guide/maps/${mapId}/rounds/${roundId}`, { method: 'DELETE' });
 
 // Sessions
 export const createSession = (mapId: string, timeLimitSec?: number) =>

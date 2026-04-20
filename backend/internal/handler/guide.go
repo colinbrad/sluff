@@ -13,15 +13,15 @@ import (
 	"github.com/colinbradley/sluff/internal/store"
 )
 
-type AdminHandler struct {
+type GuideHandler struct {
 	store store.Store
 }
 
-func NewAdminHandler(s store.Store) *AdminHandler {
-	return &AdminHandler{store: s}
+func NewGuideHandler(s store.Store) *GuideHandler {
+	return &GuideHandler{store: s}
 }
 
-func (h *AdminHandler) CreateMap(w http.ResponseWriter, r *http.Request) {
+func (h *GuideHandler) CreateMap(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
@@ -52,7 +52,7 @@ func (h *AdminHandler) CreateMap(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, m)
 }
 
-func (h *AdminHandler) ListMaps(w http.ResponseWriter, r *http.Request) {
+func (h *GuideHandler) ListMaps(w http.ResponseWriter, r *http.Request) {
 	maps, err := h.store.ListMaps()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list maps")
@@ -64,7 +64,7 @@ func (h *AdminHandler) ListMaps(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, maps)
 }
 
-func (h *AdminHandler) GetMap(w http.ResponseWriter, r *http.Request) {
+func (h *GuideHandler) GetMap(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "mapID")
 	m, err := h.store.GetMap(id)
 	if err != nil {
@@ -144,7 +144,7 @@ func (h *AdminHandler) GetMap(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, mapJSON)
 }
 
-func (h *AdminHandler) UpdateMap(w http.ResponseWriter, r *http.Request) {
+func (h *GuideHandler) UpdateMap(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "mapID")
 
 	var req struct {
@@ -175,7 +175,7 @@ func (h *AdminHandler) UpdateMap(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, m)
 }
 
-func (h *AdminHandler) DeleteMap(w http.ResponseWriter, r *http.Request) {
+func (h *GuideHandler) DeleteMap(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "mapID")
 	if err := h.store.DeleteMap(id); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to delete map")
@@ -192,7 +192,7 @@ type createRoundRequest struct {
 	Corridor    json.RawMessage `json:"corridor"`
 }
 
-func (h *AdminHandler) CreateRound(w http.ResponseWriter, r *http.Request) {
+func (h *GuideHandler) CreateRound(w http.ResponseWriter, r *http.Request) {
 	mapID := chi.URLParam(r, "mapID")
 
 	m, err := h.store.GetMap(mapID)
@@ -239,7 +239,7 @@ func (h *AdminHandler) CreateRound(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, roundToGeoJSON(round))
 }
 
-func (h *AdminHandler) UpdateRound(w http.ResponseWriter, r *http.Request) {
+func (h *GuideHandler) UpdateRound(w http.ResponseWriter, r *http.Request) {
 	roundID := chi.URLParam(r, "roundID")
 
 	existing, err := h.store.GetRound(roundID)
@@ -304,7 +304,7 @@ func (h *AdminHandler) UpdateRound(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, roundToGeoJSON(existing))
 }
 
-func (h *AdminHandler) DeleteRound(w http.ResponseWriter, r *http.Request) {
+func (h *GuideHandler) DeleteRound(w http.ResponseWriter, r *http.Request) {
 	roundID := chi.URLParam(r, "roundID")
 	if err := h.store.DeleteRound(roundID); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to delete round")

@@ -65,7 +65,7 @@ export default function SoloSetup() {
 
         {maps.length === 0 ? (
           <p className="text-gray-500">
-            No maps available. An admin needs to create one first.
+            No maps available. A guide needs to create one first.
           </p>
         ) : (
           <>

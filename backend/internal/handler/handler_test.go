@@ -23,7 +23,7 @@ import (
 type testEnv struct {
 	store   store.Store
 	hub     *ws.Hub
-	adminH  *handler.AdminHandler
+	guideH  *handler.GuideHandler
 	sessH   *handler.SessionHandler
 	gameH   *handler.GameHandler
 	router  *chi.Mux
@@ -41,21 +41,21 @@ func newTestEnv(t *testing.T) *testEnv {
 	hub := ws.NewHub()
 	go hub.Run()
 
-	adminH := handler.NewAdminHandler(s)
+	guideH := handler.NewGuideHandler(s)
 	sessH := handler.NewSessionHandler(s)
 	gameH := handler.NewGameHandler(s, hub)
 
 	r := chi.NewRouter()
 
-	// Admin routes
-	r.Route("/api/admin/maps", func(r chi.Router) {
-		r.Post("/", adminH.CreateMap)
-		r.Get("/", adminH.ListMaps)
-		r.Get("/{mapID}", adminH.GetMap)
-		r.Put("/{mapID}", adminH.UpdateMap)
-		r.Delete("/{mapID}", adminH.DeleteMap)
-		r.Post("/{mapID}/rounds", adminH.CreateRound)
-		r.Delete("/{mapID}/rounds/{roundID}", adminH.DeleteRound)
+	// Guide routes
+	r.Route("/api/guide/maps", func(r chi.Router) {
+		r.Post("/", guideH.CreateMap)
+		r.Get("/", guideH.ListMaps)
+		r.Get("/{mapID}", guideH.GetMap)
+		r.Put("/{mapID}", guideH.UpdateMap)
+		r.Delete("/{mapID}", guideH.DeleteMap)
+		r.Post("/{mapID}/rounds", guideH.CreateRound)
+		r.Delete("/{mapID}/rounds/{roundID}", guideH.DeleteRound)
 	})
 
 	// Session routes
@@ -69,7 +69,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	return &testEnv{
 		store:  s,
 		hub:    hub,
-		adminH: adminH,
+		guideH: guideH,
 		sessH:  sessH,
 		gameH:  gameH,
 		router: r,
@@ -145,16 +145,16 @@ const corridorJSON = `{"type":"Polygon","coordinates":[[[-111.60,40.58],[-111.54
 const routeLineJSON = `{"type":"LineString","coordinates":[[-111.58,40.59],[-111.57,40.60],[-111.56,40.61]]}`
 
 // ---------------------------------------------------------------------------
-// Admin API Tests
+// Guide API Tests
 // ---------------------------------------------------------------------------
 
-func TestAdminAPI(t *testing.T) {
+func TestGuideAPI(t *testing.T) {
 	env := newTestEnv(t)
 
 	var mapID string
 
 	t.Run("CreateMap_201", func(t *testing.T) {
-		rr := env.doRequest(t, http.MethodPost, "/api/admin/maps/", map[string]string{
+		rr := env.doRequest(t, http.MethodPost, "/api/guide/maps/", map[string]string{
 			"name":        "Wasatch Test Map",
 			"description": "Integration test map",
 		})
@@ -173,7 +173,7 @@ func TestAdminAPI(t *testing.T) {
 	})
 
 	t.Run("ListMaps_200", func(t *testing.T) {
-		rr := env.doRequest(t, http.MethodGet, "/api/admin/maps/", nil)
+		rr := env.doRequest(t, http.MethodGet, "/api/guide/maps/", nil)
 		if rr.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 		}
@@ -194,7 +194,7 @@ func TestAdminAPI(t *testing.T) {
 			"end_point":    json.RawMessage(endPointJSON),
 			"corridor":     json.RawMessage(corridorJSON),
 		}
-		rr := env.doRequest(t, http.MethodPost, "/api/admin/maps/"+mapID+"/rounds", body)
+		rr := env.doRequest(t, http.MethodPost, "/api/guide/maps/"+mapID+"/rounds", body)
 		if rr.Code != http.StatusCreated {
 			t.Fatalf("expected 201, got %d: %s", rr.Code, rr.Body.String())
 		}
@@ -205,7 +205,7 @@ func TestAdminAPI(t *testing.T) {
 	})
 
 	t.Run("GetMap_200_WithRounds", func(t *testing.T) {
-		rr := env.doRequest(t, http.MethodGet, "/api/admin/maps/"+mapID, nil)
+		rr := env.doRequest(t, http.MethodGet, "/api/guide/maps/"+mapID, nil)
 		if rr.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 		}
@@ -235,7 +235,7 @@ func TestAdminAPI(t *testing.T) {
 			"end_point":    json.RawMessage(samePoint),
 			"corridor":     json.RawMessage(corridorJSON),
 		}
-		rr := env.doRequest(t, http.MethodPost, "/api/admin/maps/"+mapID+"/rounds", body)
+		rr := env.doRequest(t, http.MethodPost, "/api/guide/maps/"+mapID+"/rounds", body)
 		if rr.Code != http.StatusBadRequest {
 			t.Fatalf("expected 400, got %d: %s", rr.Code, rr.Body.String())
 		}
@@ -251,20 +251,20 @@ func TestAdminAPI(t *testing.T) {
 			"name":         "Incomplete Round",
 			// Missing start_point, end_point, corridor
 		}
-		rr := env.doRequest(t, http.MethodPost, "/api/admin/maps/"+mapID+"/rounds", body)
+		rr := env.doRequest(t, http.MethodPost, "/api/guide/maps/"+mapID+"/rounds", body)
 		if rr.Code != http.StatusBadRequest {
 			t.Fatalf("expected 400, got %d: %s", rr.Code, rr.Body.String())
 		}
 	})
 
 	t.Run("DeleteRound_204_ThenMapHasNoRounds", func(t *testing.T) {
-		rr := env.doRequest(t, http.MethodDelete, "/api/admin/maps/"+mapID+"/rounds/"+roundID, nil)
+		rr := env.doRequest(t, http.MethodDelete, "/api/guide/maps/"+mapID+"/rounds/"+roundID, nil)
 		if rr.Code != http.StatusNoContent {
 			t.Fatalf("expected 204, got %d: %s", rr.Code, rr.Body.String())
 		}
 
 		// Verify the map now has no rounds
-		rr2 := env.doRequest(t, http.MethodGet, "/api/admin/maps/"+mapID, nil)
+		rr2 := env.doRequest(t, http.MethodGet, "/api/guide/maps/"+mapID, nil)
 		if rr2.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", rr2.Code)
 		}
@@ -285,7 +285,7 @@ func TestGameFlowSmoke(t *testing.T) {
 	env := newTestEnv(t)
 
 	// Step 1: Create a map
-	rr := env.doRequest(t, http.MethodPost, "/api/admin/maps/", map[string]string{
+	rr := env.doRequest(t, http.MethodPost, "/api/guide/maps/", map[string]string{
 		"name": "Smoke Test Map",
 	})
 	if rr.Code != http.StatusCreated {
@@ -301,7 +301,7 @@ func TestGameFlowSmoke(t *testing.T) {
 		"end_point":    json.RawMessage(endPointJSON),
 		"corridor":     json.RawMessage(corridorJSON),
 	}
-	rr = env.doRequest(t, http.MethodPost, "/api/admin/maps/"+mapID+"/rounds", roundBody)
+	rr = env.doRequest(t, http.MethodPost, "/api/guide/maps/"+mapID+"/rounds", roundBody)
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("create round: expected 201, got %d: %s", rr.Code, rr.Body.String())
 	}
