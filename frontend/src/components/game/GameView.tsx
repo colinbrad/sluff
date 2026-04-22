@@ -53,6 +53,8 @@ export default function GameView() {
   }, [sessionId, reset]);
 
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const currentRoundRef = useRef<typeof currentRound>(currentRound);
+  useEffect(() => { currentRoundRef.current = currentRound; }, [currentRound]);
   const drawRef = useRef<TerraDraw | null>(null);
   const wsRef = useRef<GameWebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -156,6 +158,12 @@ export default function GameView() {
     };
   }, [phase, timeRemaining, setTimeRemaining]);
 
+  // Reset mapReady when the score screen hides the map, so the flag flips
+  // false → true when the map remounts for the next round, re-triggering fitBounds.
+  useEffect(() => {
+    if (showScores) setMapReady(false);
+  }, [showScores]);
+
   // Show round on map whenever currentRound changes AND map is ready.
   // This is the single source of truth for rendering round markers/corridor,
   // eliminating race conditions between map load and data arrival.
@@ -218,6 +226,17 @@ export default function GameView() {
     (map: maplibregl.Map) => {
       mapRef.current = map;
       setMapReady(true);
+
+      // Fit to round bounds immediately on map load (handles first-round case
+      // where the useEffect may fire before mapRef.current is set).
+      const cr = currentRoundRef.current;
+      if (cr?.start_point?.coordinates && cr?.end_point?.coordinates) {
+        const bounds = new maplibregl.LngLatBounds(
+          cr.start_point.coordinates as [number, number],
+          cr.end_point.coordinates as [number, number]
+        );
+        map.fitBounds(bounds, { padding: 120, maxZoom: 16 });
+      }
 
       const draw = new TerraDraw({
         adapter: new TerraDrawMapLibreGLAdapter({ map }),

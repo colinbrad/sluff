@@ -33,6 +33,26 @@ make dev
 
 Backend runs on `:8080`, frontend on `:5173` with proxy to backend.
 
+### Testing
+
+```bash
+# Backend — all packages (uses real SQLite DBs in temp dirs)
+cd backend && go test ./...
+
+# Backend — verbose output with test names
+cd backend && go test -v ./...
+
+# Backend — specific package
+cd backend && go test ./internal/handler/...
+cd backend && go test ./internal/store/...
+
+# Frontend — all tests (Vitest)
+cd frontend && npm test
+
+# Frontend — watch mode during development
+cd frontend && npx vitest
+```
+
 ### Build
 
 ```bash

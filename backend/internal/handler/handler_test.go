@@ -55,15 +55,22 @@ func newTestEnv(t *testing.T) *testEnv {
 		r.Put("/{mapID}", guideH.UpdateMap)
 		r.Delete("/{mapID}", guideH.DeleteMap)
 		r.Post("/{mapID}/rounds", guideH.CreateRound)
+		r.Put("/{mapID}/rounds/{roundID}", guideH.UpdateRound)
 		r.Delete("/{mapID}/rounds/{roundID}", guideH.DeleteRound)
 	})
 
 	// Session routes
 	r.Route("/api/sessions", func(r chi.Router) {
+		r.Post("/", sessH.CreateSession)
 		r.Post("/solo", sessH.CreateSoloSession)
 		r.Get("/{sessionID}", sessH.GetSession)
+		r.Get("/code/{code}", sessH.GetSessionByCode)
+		r.Post("/{sessionID}/join", sessH.JoinSession)
+		r.Post("/{sessionID}/teams", sessH.CreateTeam)
+		r.Post("/{sessionID}/teams/{teamID}/join", sessH.JoinTeam)
 		r.Post("/{sessionID}/start", gameH.StartGame)
 		r.Post("/{sessionID}/rounds/{roundID}/submit", gameH.SubmitRoute)
+		r.Get("/{sessionID}/rounds/{roundID}/scores", gameH.GetScores)
 	})
 
 	return &testEnv{
