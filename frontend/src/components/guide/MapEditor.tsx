@@ -29,13 +29,14 @@ function useMobileBreakpoint(breakpoint = 768) {
   return isMobile;
 }
 
-type Step = 'idle' | 'start' | 'end' | 'corridor' | 'review';
+type Step = 'idle' | 'start' | 'end' | 'corridor' | 'no_go_zone' | 'review';
 
 const STEP_INFO: Record<Exclude<Step, 'idle'>, { label: string; number: number; instruction: string }> = {
   start: { label: 'Start Point', number: 1, instruction: 'Click on the map to place the start point.' },
   end: { label: 'End Point', number: 2, instruction: 'Click on the map to place the end point.' },
   corridor: { label: 'Corridor', number: 3, instruction: 'Click to draw the corridor polygon. Double-click or click the first point to close it.' },
-  review: { label: 'Review', number: 4, instruction: 'Review your round and click Save when ready.' },
+  no_go_zone: { label: 'No-Go Zones', number: 4, instruction: 'Draw areas players should avoid. Click "Draw Zone" to add one, or skip if none needed.' },
+  review: { label: 'Review', number: 5, instruction: 'Review your round and click Save when ready.' },
 };
 
 export default function MapEditor() {
@@ -48,6 +49,7 @@ export default function MapEditor() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [placed, setPlaced] = useState({ start: false, end: false, corridor: false });
+  const [noGoZoneIds, setNoGoZoneIds] = useState<FeatureId[]>([]); // optional, can be empty
   const [terrain3d, setTerrain3d] = useState(false);
   const [slopeShading, setSlopeShading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -118,6 +120,28 @@ export default function MapEditor() {
         });
       }
 
+      // No-go zones: red fill
+      for (let zi = 0; zi < (round.no_go_zones?.length ?? 0); zi++) {
+        const zone = round.no_go_zones![zi];
+        const zoneId = `${srcId}-nogo-${zi}`;
+        map.addSource(zoneId, {
+          type: 'geojson',
+          data: { type: 'Feature', geometry: zone, properties: {} },
+        });
+        map.addLayer({
+          id: `${zoneId}-fill`,
+          type: 'fill',
+          source: zoneId,
+          paint: { 'fill-color': '#EF4444', 'fill-opacity': 0.25 },
+        });
+        map.addLayer({
+          id: `${zoneId}-outline`,
+          type: 'line',
+          source: zoneId,
+          paint: { 'line-color': '#EF4444', 'line-width': 2, 'line-dasharray': [3, 2] },
+        });
+      }
+
       if (round.start_point?.coordinates) {
         const startMarker = new maplibregl.Marker({ color: '#10B981', scale: 0.8 })
           .setLngLat(round.start_point.coordinates as [number, number])
@@ -178,6 +202,7 @@ export default function MapEditor() {
       case 'corridor':
         draw.setMode('polygon');
         break;
+      case 'no_go_zone':
       case 'review':
       case 'idle':
         draw.setMode('select');
@@ -193,6 +218,7 @@ export default function MapEditor() {
     endPointId.current = null;
     corridorId.current = null;
     setPlaced({ start: false, end: false, corridor: false });
+    setNoGoZoneIds([]);
   };
 
   // Listen for draw finish events and auto-advance steps
@@ -236,7 +262,10 @@ export default function MapEditor() {
         }
         corridorId.current = id;
         setPlaced((p) => ({ ...p, corridor: true }));
-        setStep('review');
+        setStep('no_go_zone');
+      } else if (step === 'no_go_zone' && feature.geometry.type === 'Polygon') {
+        setNoGoZoneIds((prev) => [...prev, id]);
+        draw.setMode('select');
       }
     };
 
@@ -253,11 +282,20 @@ export default function MapEditor() {
 
     clearDrawing();
 
-    const results = draw.addFeatures([
+    // terra-draw addFeatures expects GeoJSONStoreFeatures (Point | LineString | Polygon only)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const featuresToAdd: any[] = [
       { type: 'Feature', geometry: round.start_point, properties: { mode: 'point' } },
       { type: 'Feature', geometry: round.end_point, properties: { mode: 'point' } },
       { type: 'Feature', geometry: round.corridor, properties: { mode: 'polygon' } },
-    ]);
+    ];
+    const noGoCount = round.no_go_zones?.length ?? 0;
+    for (const zone of round.no_go_zones ?? []) {
+      featuresToAdd.push({ type: 'Feature', geometry: zone, properties: { mode: 'polygon' } });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const results = draw.addFeatures(featuresToAdd as any);
 
     const newPlaced = { start: false, end: false, corridor: false };
     if (results[0]?.id != null) {
@@ -272,6 +310,12 @@ export default function MapEditor() {
       corridorId.current = results[2].id;
       newPlaced.corridor = true;
     }
+    const loadedZoneIds: FeatureId[] = [];
+    for (let i = 0; i < noGoCount; i++) {
+      const r = results[3 + i];
+      if (r?.id != null) loadedZoneIds.push(r.id);
+    }
+    setNoGoZoneIds(loadedZoneIds);
     setPlaced(newPlaced);
 
     const coords = round.corridor.coordinates[0];
@@ -322,6 +366,11 @@ export default function MapEditor() {
     setSaveError('');
     setSaving(true);
     try {
+      const noGoZoneGeometries = noGoZoneIds
+        .map((id) => snapshot.find((f) => f.id === id))
+        .filter((f): f is NonNullable<typeof f> => f != null)
+        .map((f) => f.geometry as GeoJSON.Polygon);
+
       const roundNumber = editingRound ?? (gameMap.rounds?.length || 0) + 1;
       const data = {
         round_number: roundNumber,
@@ -329,6 +378,7 @@ export default function MapEditor() {
         start_point: startFeature.geometry as GeoJSON.Geometry,
         end_point: endFeature.geometry as GeoJSON.Geometry,
         corridor: corridorFeature.geometry as GeoJSON.Geometry,
+        no_go_zones: noGoZoneGeometries,
       };
 
       if (editingRound !== null && gameMap.rounds) {
@@ -463,10 +513,10 @@ export default function MapEditor() {
                   {editingRound !== null ? `Edit Round ${editingRound}` : 'New Round'}
                 </h3>
                 <div className="flex flex-col gap-1">
-                  {(['start', 'end', 'corridor'] as const).map((s) => {
+                  {(['start', 'end', 'corridor', 'no_go_zone'] as const).map((s) => {
                     const info = STEP_INFO[s];
                     const isCurrent = step === s;
-                    const isComplete = placed[s];
+                    const isComplete = s === 'no_go_zone' ? noGoZoneIds.length > 0 : placed[s];
 
                     return (
                       <div key={s} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
@@ -488,9 +538,9 @@ export default function MapEditor() {
                           {isComplete && !isCurrent ? '\u2713' : info.number}
                         </span>
                         <span className="flex-1">{info.label}</span>
-                        {isComplete && !isCurrent && (
+                        {isComplete && !isCurrent && s !== 'no_go_zone' && (
                           <button
-                            onClick={() => redoStep(s)}
+                            onClick={() => redoStep(s as 'start' | 'end' | 'corridor')}
                             className="text-xs text-green-600 hover:text-green-800"
                           >
                             redo
@@ -503,11 +553,52 @@ export default function MapEditor() {
               </div>
 
               {/* Current step instruction */}
-              {step !== 'review' && (
+              {step !== 'review' && step !== 'no_go_zone' && (
                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
                   <p className="text-sm text-blue-800">
                     {STEP_INFO[step].instruction}
                   </p>
+                </div>
+              )}
+
+              {/* No-go zone controls */}
+              {step === 'no_go_zone' && (
+                <div className="flex flex-col gap-2">
+                  <div className="bg-red-50 border border-red-100 rounded-lg p-3">
+                    <p className="text-sm text-red-800">
+                      {STEP_INFO.no_go_zone.instruction}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => drawRef.current?.setMode('polygon')}
+                    className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium transition-colors"
+                  >
+                    + Draw Zone
+                  </button>
+                  {noGoZoneIds.length > 0 && (
+                    <div className="flex flex-col gap-1">
+                      {noGoZoneIds.map((id, i) => (
+                        <div key={String(id)} className="flex items-center justify-between bg-red-50 rounded px-3 py-1.5 text-sm">
+                          <span className="text-red-800">Zone {i + 1}</span>
+                          <button
+                            onClick={() => {
+                              try { drawRef.current?.removeFeatures([id]); } catch { /* noop */ }
+                              setNoGoZoneIds((prev) => prev.filter((z) => z !== id));
+                            }}
+                            className="text-red-600 hover:text-red-800 text-xs"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setStep('review')}
+                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition-colors"
+                  >
+                    {noGoZoneIds.length === 0 ? 'Skip (no zones)' : 'Done'}
+                  </button>
                 </div>
               )}
 

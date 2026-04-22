@@ -93,6 +93,28 @@ export default function RoundReview({
     const bounds = new maplibregl.LngLatBounds();
     let hasBounds = false;
 
+    // Add no-go zones
+    for (let i = 0; i < (currentRound?.no_go_zones?.length ?? 0); i++) {
+      const zone = currentRound!.no_go_zones![i];
+      const srcId = `review-nogo-${i}`;
+      map.addSource(srcId, {
+        type: 'geojson',
+        data: { type: 'Feature', geometry: zone, properties: {} },
+      });
+      map.addLayer({
+        id: srcId + '-fill',
+        type: 'fill',
+        source: srcId,
+        paint: { 'fill-color': '#EF4444', 'fill-opacity': 0.25 },
+      });
+      map.addLayer({
+        id: srcId + '-outline',
+        type: 'line',
+        source: srcId,
+        paint: { 'line-color': '#EF4444', 'line-width': 2, 'line-dasharray': [3, 2] },
+      });
+    }
+
     // Add start/end markers from the round
     if (currentRound?.start_point?.coordinates) {
       new maplibregl.Marker({ color: '#10B981' })
@@ -277,7 +299,7 @@ export default function RoundReview({
                     </div>
                   </div>
 
-                  <div className="flex gap-2 mt-2">
+                  <div className="flex flex-wrap gap-2 mt-2">
                     {entry.score.connects_start && (
                       <span className="text-xs px-2 py-0.5 bg-green-900 text-green-300 rounded">
                         Start
@@ -286,6 +308,11 @@ export default function RoundReview({
                     {entry.score.connects_end && (
                       <span className="text-xs px-2 py-0.5 bg-green-900 text-green-300 rounded">
                         End
+                      </span>
+                    )}
+                    {(entry.score.no_go_zone_penalty ?? 0) > 0 && (
+                      <span className="text-xs px-2 py-0.5 bg-red-900 text-red-300 rounded">
+                        No-go: -{entry.score.no_go_zone_penalty!.toFixed(0)}pts
                       </span>
                     )}
                   </div>

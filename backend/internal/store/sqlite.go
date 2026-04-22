@@ -116,19 +116,20 @@ func (s *SQLiteStore) CreateRound(r *model.Round) error {
 	startJSON, _ := geojson.NewGeometry(r.StartPoint).MarshalJSON()
 	endJSON, _ := geojson.NewGeometry(r.EndPoint).MarshalJSON()
 	corrJSON, _ := geojson.NewGeometry(r.Corridor).MarshalJSON()
+	noGoJSON := model.NoGoZonesToJSON(r.NoGoZones)
 
 	_, err := s.db.Exec(
-		"INSERT INTO rounds (id, map_id, round_number, name, start_point, end_point, corridor) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		r.ID, r.MapID, r.RoundNumber, r.Name, string(startJSON), string(endJSON), string(corrJSON),
+		"INSERT INTO rounds (id, map_id, round_number, name, start_point, end_point, corridor, no_go_zones) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		r.ID, r.MapID, r.RoundNumber, r.Name, string(startJSON), string(endJSON), string(corrJSON), noGoJSON,
 	)
 	return err
 }
 
 func (s *SQLiteStore) GetRound(id string) (*model.Round, error) {
 	r := &model.Round{}
-	var startJSON, endJSON, corrJSON string
-	err := s.db.QueryRow("SELECT id, map_id, round_number, name, start_point, end_point, corridor FROM rounds WHERE id = ?", id).
-		Scan(&r.ID, &r.MapID, &r.RoundNumber, &r.Name, &startJSON, &endJSON, &corrJSON)
+	var startJSON, endJSON, corrJSON, noGoJSON string
+	err := s.db.QueryRow("SELECT id, map_id, round_number, name, start_point, end_point, corridor, no_go_zones FROM rounds WHERE id = ?", id).
+		Scan(&r.ID, &r.MapID, &r.RoundNumber, &r.Name, &startJSON, &endJSON, &corrJSON, &noGoJSON)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -140,11 +141,15 @@ func (s *SQLiteStore) GetRound(id string) (*model.Round, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse round geometry: %w", err)
 	}
+	r.NoGoZones, err = model.NoGoZonesFromJSON(noGoJSON)
+	if err != nil {
+		return nil, fmt.Errorf("parse no-go zones: %w", err)
+	}
 	return r, nil
 }
 
 func (s *SQLiteStore) GetRoundsByMap(mapID string) ([]model.Round, error) {
-	rows, err := s.db.Query("SELECT id, map_id, round_number, name, start_point, end_point, corridor FROM rounds WHERE map_id = ? ORDER BY round_number", mapID)
+	rows, err := s.db.Query("SELECT id, map_id, round_number, name, start_point, end_point, corridor, no_go_zones FROM rounds WHERE map_id = ? ORDER BY round_number", mapID)
 	if err != nil {
 		return nil, err
 	}
@@ -153,13 +158,17 @@ func (s *SQLiteStore) GetRoundsByMap(mapID string) ([]model.Round, error) {
 	var rounds []model.Round
 	for rows.Next() {
 		var r model.Round
-		var startJSON, endJSON, corrJSON string
-		if err := rows.Scan(&r.ID, &r.MapID, &r.RoundNumber, &r.Name, &startJSON, &endJSON, &corrJSON); err != nil {
+		var startJSON, endJSON, corrJSON, noGoJSON string
+		if err := rows.Scan(&r.ID, &r.MapID, &r.RoundNumber, &r.Name, &startJSON, &endJSON, &corrJSON, &noGoJSON); err != nil {
 			return nil, err
 		}
 		r.StartPoint, r.EndPoint, r.Corridor, err = model.RoundFromJSON(startJSON, endJSON, corrJSON)
 		if err != nil {
 			return nil, fmt.Errorf("parse round geometry: %w", err)
+		}
+		r.NoGoZones, err = model.NoGoZonesFromJSON(noGoJSON)
+		if err != nil {
+			return nil, fmt.Errorf("parse no-go zones: %w", err)
 		}
 		rounds = append(rounds, r)
 	}
@@ -170,10 +179,11 @@ func (s *SQLiteStore) UpdateRound(r *model.Round) error {
 	startJSON, _ := geojson.NewGeometry(r.StartPoint).MarshalJSON()
 	endJSON, _ := geojson.NewGeometry(r.EndPoint).MarshalJSON()
 	corrJSON, _ := geojson.NewGeometry(r.Corridor).MarshalJSON()
+	noGoJSON := model.NoGoZonesToJSON(r.NoGoZones)
 
 	_, err := s.db.Exec(
-		"UPDATE rounds SET round_number = ?, name = ?, start_point = ?, end_point = ?, corridor = ? WHERE id = ?",
-		r.RoundNumber, r.Name, string(startJSON), string(endJSON), string(corrJSON), r.ID,
+		"UPDATE rounds SET round_number = ?, name = ?, start_point = ?, end_point = ?, corridor = ?, no_go_zones = ? WHERE id = ?",
+		r.RoundNumber, r.Name, string(startJSON), string(endJSON), string(corrJSON), noGoJSON, r.ID,
 	)
 	return err
 }

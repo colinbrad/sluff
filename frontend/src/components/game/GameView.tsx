@@ -164,6 +164,8 @@ export default function GameView() {
     if (showScores) setMapReady(false);
   }, [showScores]);
 
+  const noGoLayerIdsRef = useRef<string[]>([]);
+
   // Show round on map whenever currentRound changes AND map is ready.
   // This is the single source of truth for rendering round markers/corridor,
   // eliminating race conditions between map load and data arrival.
@@ -177,6 +179,37 @@ export default function GameView() {
       m.remove();
     }
     markersRef.current = [];
+
+    // Remove previous no-go zone layers/sources
+    for (const id of noGoLayerIdsRef.current) {
+      if (map.getLayer(id + '-fill')) map.removeLayer(id + '-fill');
+      if (map.getLayer(id + '-outline')) map.removeLayer(id + '-outline');
+      if (map.getSource(id)) map.removeSource(id);
+    }
+    noGoLayerIdsRef.current = [];
+
+    // Add no-go zone layers
+    for (let i = 0; i < (currentRound.no_go_zones?.length ?? 0); i++) {
+      const zone = currentRound.no_go_zones![i];
+      const srcId = `nogo-zone-${i}`;
+      map.addSource(srcId, {
+        type: 'geojson',
+        data: { type: 'Feature', geometry: zone, properties: {} },
+      });
+      map.addLayer({
+        id: srcId + '-fill',
+        type: 'fill',
+        source: srcId,
+        paint: { 'fill-color': '#EF4444', 'fill-opacity': 0.25 },
+      });
+      map.addLayer({
+        id: srcId + '-outline',
+        type: 'line',
+        source: srcId,
+        paint: { 'line-color': '#EF4444', 'line-width': 2, 'line-dasharray': [3, 2] },
+      });
+      noGoLayerIdsRef.current.push(srcId);
+    }
 
     // Add start marker
     if (currentRound.start_point?.coordinates) {

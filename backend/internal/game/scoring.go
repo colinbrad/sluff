@@ -16,7 +16,7 @@ const (
 	endpointThreshold = 50.0 // meters
 )
 
-// ScoreRoute scores a player-drawn route against a round's corridor.
+// ScoreRoute scores a player-drawn route against a round's corridor and no-go zones.
 // pathJSON is a GeoJSON geometry (LineString).
 func ScoreRoute(pathJSON string, round *model.Round) (model.ScoreDetails, error) {
 	geom, err := geojson.UnmarshalGeometry([]byte(pathJSON))
@@ -29,14 +29,15 @@ func ScoreRoute(pathJSON string, round *model.Round) (model.ScoreDetails, error)
 		return model.ScoreDetails{}, err
 	}
 
-	return scoreLineAgainstCorridor(route, round.Corridor, round.StartPoint, round.EndPoint), nil
+	return scoreLineAgainstCorridor(route, round.Corridor, round.StartPoint, round.EndPoint, round.NoGoZones), nil
 }
 
-func scoreLineAgainstCorridor(route orb.LineString, corridor orb.Polygon, start, end orb.Point) model.ScoreDetails {
+func scoreLineAgainstCorridor(route orb.LineString, corridor orb.Polygon, start, end orb.Point, noGoZones []orb.Polygon) model.ScoreDetails {
 	samples := geoutil.SampleLineString(route, sampleCount)
 
 	insideCount := 0
 	maxDeviation := 0.0
+	noGoCount := 0
 
 	for _, pt := range samples {
 		if geoutil.PointInPolygon(pt, corridor) {
@@ -45,6 +46,12 @@ func scoreLineAgainstCorridor(route orb.LineString, corridor orb.Polygon, start,
 			dist := geoutil.MinDistanceToPolygonBoundary(pt, corridor)
 			if dist > maxDeviation {
 				maxDeviation = dist
+			}
+		}
+		for _, zone := range noGoZones {
+			if geoutil.PointInPolygon(pt, zone) {
+				noGoCount++
+				break
 			}
 		}
 	}
@@ -90,7 +97,14 @@ func scoreLineAgainstCorridor(route orb.LineString, corridor orb.Polygon, start,
 		deviationScore = math.Max(0, 100-(maxDeviation/10))
 	}
 
-	finalScore := adherenceScore + endpointScore + efficiencyScore + deviationScore
+	// No-go zone penalty: up to 300 points deducted proportional to % of route in no-go zones
+	noGoZonePenalty := 0.0
+	if noGoCount > 0 && totalSamples > 0 {
+		percentInNoGo := float64(noGoCount) / float64(totalSamples) * 100
+		noGoZonePenalty = math.Round((percentInNoGo/100.0*300.0)*10) / 10
+	}
+
+	finalScore := math.Max(0, adherenceScore+endpointScore+efficiencyScore+deviationScore-noGoZonePenalty)
 
 	return model.ScoreDetails{
 		TotalPoints:       totalSamples,
@@ -100,6 +114,8 @@ func scoreLineAgainstCorridor(route orb.LineString, corridor orb.Polygon, start,
 		MaxDeviationM:     math.Round(maxDeviation*10) / 10,
 		ConnectsStart:     connectsStart,
 		ConnectsEnd:       connectsEnd,
+		PointsInNoGoZone:  noGoCount,
+		NoGoZonePenalty:   noGoZonePenalty,
 		FinalScore:        math.Round(finalScore*10) / 10,
 	}
 }

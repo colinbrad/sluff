@@ -80,43 +80,9 @@ func (h *GameHandler) StartGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Broadcast round start to all connected players. Convert orb geometries
-	// into GeoJSON-like objects so the frontend can render points/polygons.
+	// Broadcast round start to all connected players.
 	round := rounds[nextRound-1]
-
-	// build start/end as GeoJSON objects
-	startGeo := map[string]interface{}{
-		"type":        "Point",
-		"coordinates": []float64{round.StartPoint[0], round.StartPoint[1]},
-	}
-	endGeo := map[string]interface{}{
-		"type":        "Point",
-		"coordinates": []float64{round.EndPoint[0], round.EndPoint[1]},
-	}
-
-	// build polygon coordinates ([][][2]) from orb.Polygon
-	polyCoords := make([][][]float64, len(round.Corridor))
-	for i, ring := range round.Corridor {
-		ringCoords := make([][]float64, len(ring))
-		for j, pt := range ring {
-			ringCoords[j] = []float64{pt[0], pt[1]}
-		}
-		polyCoords[i] = ringCoords
-	}
-	corridorGeo := map[string]interface{}{
-		"type":        "Polygon",
-		"coordinates": polyCoords,
-	}
-
-	payload := map[string]interface{}{
-		"id":           round.ID,
-		"map_id":       round.MapID,
-		"round_number": round.RoundNumber,
-		"name":         round.Name,
-		"start_point":  startGeo,
-		"end_point":    endGeo,
-		"corridor":     corridorGeo,
-	}
+	payload := roundToGeoJSON(&round)
 
 	h.hub.BroadcastToSession(sessionID, model.WSMessage{
 		Type:    model.MsgRoundStart,

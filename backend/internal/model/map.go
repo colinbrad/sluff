@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -18,13 +19,14 @@ type GameMap struct {
 }
 
 type Round struct {
-	ID          string      `json:"id"`
-	MapID       string      `json:"map_id"`
-	RoundNumber int         `json:"round_number"`
-	Name        string      `json:"name"`
-	StartPoint  orb.Point   `json:"start_point"`
-	EndPoint    orb.Point   `json:"end_point"`
-	Corridor    orb.Polygon `json:"corridor"`
+	ID          string        `json:"id"`
+	MapID       string        `json:"map_id"`
+	RoundNumber int           `json:"round_number"`
+	Name        string        `json:"name"`
+	StartPoint  orb.Point     `json:"start_point"`
+	EndPoint    orb.Point     `json:"end_point"`
+	Corridor    orb.Polygon   `json:"corridor"`
+	NoGoZones   []orb.Polygon `json:"no_go_zones,omitempty"`
 }
 
 // ValidateRound checks that a round has valid, non-zero start/end points,
@@ -63,4 +65,42 @@ func RoundFromJSON(startPointJSON, endPointJSON, corridorJSON string) (orb.Point
 	}
 
 	return startGeom.Geometry().(orb.Point), endGeom.Geometry().(orb.Point), corrGeom.Geometry().(orb.Polygon), nil
+}
+
+// NoGoZonesToJSON encodes a slice of polygons as a JSON array of GeoJSON geometries.
+func NoGoZonesToJSON(zones []orb.Polygon) string {
+	if len(zones) == 0 {
+		return "[]"
+	}
+	geoms := make([]json.RawMessage, len(zones))
+	for i, z := range zones {
+		b, _ := geojson.NewGeometry(z).MarshalJSON()
+		geoms[i] = b
+	}
+	b, _ := json.Marshal(geoms)
+	return string(b)
+}
+
+// NoGoZonesFromJSON decodes a JSON array of GeoJSON polygon geometries.
+func NoGoZonesFromJSON(s string) ([]orb.Polygon, error) {
+	if s == "" || s == "[]" {
+		return nil, nil
+	}
+	var raws []json.RawMessage
+	if err := json.Unmarshal([]byte(s), &raws); err != nil {
+		return nil, err
+	}
+	zones := make([]orb.Polygon, 0, len(raws))
+	for _, raw := range raws {
+		geom, err := geojson.UnmarshalGeometry(raw)
+		if err != nil {
+			return nil, err
+		}
+		poly, ok := geom.Geometry().(orb.Polygon)
+		if !ok {
+			return nil, fmt.Errorf("expected Polygon geometry in no-go zones")
+		}
+		zones = append(zones, poly)
+	}
+	return zones, nil
 }

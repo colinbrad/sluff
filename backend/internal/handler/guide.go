@@ -2,12 +2,14 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/paulmach/orb"
+	"github.com/paulmach/orb/geojson"
 
 	"github.com/colinbradley/sluff/internal/model"
 	"github.com/colinbradley/sluff/internal/store"
@@ -77,68 +79,18 @@ func (h *GuideHandler) GetMap(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert orb geometries to GeoJSON format for frontend compatibility
-	type RoundJSON struct {
-		ID          string                 `json:"id"`
-		MapID       string                 `json:"map_id"`
-		RoundNumber int                    `json:"round_number"`
-		Name        string                 `json:"name"`
-		StartPoint  map[string]interface{} `json:"start_point"`
-		EndPoint    map[string]interface{} `json:"end_point"`
-		Corridor    map[string]interface{} `json:"corridor"`
-	}
-	type MapJSON struct {
-		ID          string      `json:"id"`
-		Name        string      `json:"name"`
-		Description string      `json:"description"`
-		CreatedAt   time.Time   `json:"created_at"`
-		UpdatedAt   time.Time   `json:"updated_at"`
-		Rounds      []RoundJSON `json:"rounds,omitempty"`
-	}
-
-	roundsJSON := make([]RoundJSON, len(m.Rounds))
+	roundsJSON := make([]interface{}, len(m.Rounds))
 	for i, round := range m.Rounds {
-		// Convert start point to GeoJSON
-		startGeo := map[string]interface{}{
-			"type":        "Point",
-			"coordinates": []float64{round.StartPoint[0], round.StartPoint[1]},
-		}
-		// Convert end point to GeoJSON
-		endGeo := map[string]interface{}{
-			"type":        "Point",
-			"coordinates": []float64{round.EndPoint[0], round.EndPoint[1]},
-		}
-		// Convert corridor polygon to GeoJSON
-		polyCoords := make([][][]float64, len(round.Corridor))
-		for j, ring := range round.Corridor {
-			ringCoords := make([][]float64, len(ring))
-			for k, pt := range ring {
-				ringCoords[k] = []float64{pt[0], pt[1]}
-			}
-			polyCoords[j] = ringCoords
-		}
-		corridorGeo := map[string]interface{}{
-			"type":        "Polygon",
-			"coordinates": polyCoords,
-		}
-
-		roundsJSON[i] = RoundJSON{
-			ID:          round.ID,
-			MapID:       round.MapID,
-			RoundNumber: round.RoundNumber,
-			Name:        round.Name,
-			StartPoint:  startGeo,
-			EndPoint:    endGeo,
-			Corridor:    corridorGeo,
-		}
+		roundsJSON[i] = roundToGeoJSON(&round)
 	}
 
-	mapJSON := MapJSON{
-		ID:          m.ID,
-		Name:        m.Name,
-		Description: m.Description,
-		CreatedAt:   m.CreatedAt,
-		UpdatedAt:   m.UpdatedAt,
-		Rounds:      roundsJSON,
+	mapJSON := map[string]interface{}{
+		"id":          m.ID,
+		"name":        m.Name,
+		"description": m.Description,
+		"created_at":  m.CreatedAt,
+		"updated_at":  m.UpdatedAt,
+		"rounds":      roundsJSON,
 	}
 
 	writeJSON(w, http.StatusOK, mapJSON)
@@ -190,6 +142,7 @@ type createRoundRequest struct {
 	StartPoint  json.RawMessage `json:"start_point"`
 	EndPoint    json.RawMessage `json:"end_point"`
 	Corridor    json.RawMessage `json:"corridor"`
+	NoGoZones   json.RawMessage `json:"no_go_zones"`
 }
 
 func (h *GuideHandler) CreateRound(w http.ResponseWriter, r *http.Request) {
@@ -225,6 +178,15 @@ func (h *GuideHandler) CreateRound(w http.ResponseWriter, r *http.Request) {
 		Corridor:    corridor,
 	}
 
+	if req.NoGoZones != nil {
+		zones, err := parseNoGoZones(req.NoGoZones)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid no_go_zones: "+err.Error())
+			return
+		}
+		round.NoGoZones = zones
+	}
+
 	if err := model.ValidateRound(round); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -254,6 +216,7 @@ func (h *GuideHandler) UpdateRound(w http.ResponseWriter, r *http.Request) {
 		StartPoint  json.RawMessage `json:"start_point"`
 		EndPoint    json.RawMessage `json:"end_point"`
 		Corridor    json.RawMessage `json:"corridor"`
+		NoGoZones   json.RawMessage `json:"no_go_zones"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -288,6 +251,15 @@ func (h *GuideHandler) UpdateRound(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		existing.Corridor = corridor
+	}
+
+	if req.NoGoZones != nil {
+		zones, err := parseNoGoZones(req.NoGoZones)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid no_go_zones: "+err.Error())
+			return
+		}
+		existing.NoGoZones = zones
 	}
 
 	if err := model.ValidateRound(existing); err != nil {
@@ -325,17 +297,10 @@ func roundToGeoJSON(round *model.Round) map[string]interface{} {
 		"type":        "Point",
 		"coordinates": []float64{round.EndPoint[0], round.EndPoint[1]},
 	}
-	polyCoords := make([][][]float64, len(round.Corridor))
-	for j, ring := range round.Corridor {
-		ringCoords := make([][]float64, len(ring))
-		for k, pt := range ring {
-			ringCoords[k] = []float64{pt[0], pt[1]}
-		}
-		polyCoords[j] = ringCoords
-	}
-	corridorGeo := map[string]interface{}{
-		"type":        "Polygon",
-		"coordinates": polyCoords,
+
+	noGoGeo := make([]interface{}, len(round.NoGoZones))
+	for i, zone := range round.NoGoZones {
+		noGoGeo[i] = polygonToGeoJSON(zone)
 	}
 
 	return map[string]interface{}{
@@ -345,8 +310,44 @@ func roundToGeoJSON(round *model.Round) map[string]interface{} {
 		"name":         round.Name,
 		"start_point":  startGeo,
 		"end_point":    endGeo,
-		"corridor":     corridorGeo,
+		"corridor":     polygonToGeoJSON(round.Corridor),
+		"no_go_zones":  noGoGeo,
 	}
+}
+
+func polygonToGeoJSON(p orb.Polygon) map[string]interface{} {
+	coords := make([][][]float64, len(p))
+	for i, ring := range p {
+		coords[i] = make([][]float64, len(ring))
+		for j, pt := range ring {
+			coords[i][j] = []float64{pt[0], pt[1]}
+		}
+	}
+	return map[string]interface{}{
+		"type":        "Polygon",
+		"coordinates": coords,
+	}
+}
+
+// parseNoGoZones parses a JSON array of GeoJSON Polygon geometries.
+func parseNoGoZones(raw json.RawMessage) ([]orb.Polygon, error) {
+	var raws []json.RawMessage
+	if err := json.Unmarshal(raw, &raws); err != nil {
+		return nil, err
+	}
+	zones := make([]orb.Polygon, 0, len(raws))
+	for _, r := range raws {
+		geom, err := geojson.UnmarshalGeometry(r)
+		if err != nil {
+			return nil, err
+		}
+		poly, ok := geom.Geometry().(orb.Polygon)
+		if !ok {
+			return nil, fmt.Errorf("expected Polygon geometry")
+		}
+		zones = append(zones, poly)
+	}
+	return zones, nil
 }
 
 func toGeoJSONPoint(p orb.Point) string {

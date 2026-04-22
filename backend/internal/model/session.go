@@ -61,6 +61,8 @@ type ScoreDetails struct {
 	MaxDeviationM     float64 `json:"max_deviation_m"`
 	ConnectsStart     bool    `json:"connects_start"`
 	ConnectsEnd       bool    `json:"connects_end"`
+	PointsInNoGoZone  int     `json:"points_in_no_go_zone"`
+	NoGoZonePenalty   float64 `json:"no_go_zone_penalty"`
 	FinalScore        float64 `json:"final_score"`
 }
 

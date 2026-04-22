@@ -6,6 +6,7 @@ dist/
 frontend/dist/
 
 # Backend
+backend/cmd/sluff-server/sluff-server
 backend/data/*.db
 backend/data/*.db-wal
 backend/data/*.db-shm

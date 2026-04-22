@@ -17,6 +17,7 @@ export interface Round {
   start_point: GeoJSON.Point;
   end_point: GeoJSON.Point;
   corridor: GeoJSON.Polygon;
+  no_go_zones?: GeoJSON.Polygon[];
 }
 
 export interface Session {
@@ -66,5 +67,7 @@ export interface ScoreDetails {
   max_deviation_m: number;
   connects_start: boolean;
   connects_end: boolean;
+  points_in_no_go_zone?: number;
+  no_go_zone_penalty?: number;
   final_score: number;
 }

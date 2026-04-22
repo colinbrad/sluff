@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { FeatureCollection } from 'geojson';
 import { extractRounds, parseFile } from '../utils/importGeo';
 
