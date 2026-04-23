@@ -272,7 +272,9 @@ export default function GameView() {
       const draw = new TerraDraw({
         adapter: new TerraDrawMapLibreGLAdapter({ map }),
         modes: [
-          new TerraDrawLineStringMode(),
+          new TerraDrawLineStringMode({
+            keyEvents: { finish: 'Enter', cancel: 'Escape' },
+          }),
           new TerraDrawSelectMode({
             flags: {
               linestring: {
@@ -286,6 +288,12 @@ export default function GameView() {
       draw.start();
       draw.setMode('linestring');
       drawRef.current = draw;
+
+      // After finishing a line (Enter, double-click, etc.) switch to select so
+      // the user can review/adjust without accidentally starting a second line.
+      draw.on('finish', () => {
+        draw.setMode('select');
+      });
 
       // Multiplayer: send cursor position and broadcast drawing updates
       if (!isSolo) {

@@ -17,26 +17,26 @@ import MapOverlayControls from '../map/MapOverlayControls';
 
 function useMobileBreakpoint(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(
-    typeof window !== 'undefined' ? window.innerWidth < breakpoint : false
+    () => typeof window !== 'undefined'
+      ? window.matchMedia(`(max-width: ${breakpoint - 1}px)`).matches
+      : false
   );
   useEffect(() => {
     const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    setIsMobile(mq.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, [breakpoint]);
   return isMobile;
 }
 
-type Step = 'idle' | 'start' | 'end' | 'corridor' | 'no_go_zone' | 'review';
+type Step = 'idle' | 'start' | 'end' | 'corridor' | 'review';
 
 const STEP_INFO: Record<Exclude<Step, 'idle'>, { label: string; number: number; instruction: string }> = {
   start: { label: 'Start Point', number: 1, instruction: 'Click on the map to place the start point.' },
   end: { label: 'End Point', number: 2, instruction: 'Click on the map to place the end point.' },
   corridor: { label: 'Corridor', number: 3, instruction: 'Click to draw the corridor polygon. Double-click or click the first point to close it.' },
-  no_go_zone: { label: 'No-Go Zones', number: 4, instruction: 'Draw areas players should avoid. Click "Draw Zone" to add one, or skip if none needed.' },
-  review: { label: 'Review', number: 5, instruction: 'Review your round and click Save when ready.' },
+  review: { label: 'Review', number: 4, instruction: 'Review your round and click Save when ready.' },
 };
 
 export default function MapEditor() {
@@ -63,6 +63,7 @@ export default function MapEditor() {
   const startPointId = useRef<FeatureId | null>(null);
   const endPointId = useRef<FeatureId | null>(null);
   const corridorId = useRef<FeatureId | null>(null);
+  const isDrawingNoGoZone = useRef(false);
 
   useEffect(() => {
     if (mapId) {
@@ -202,7 +203,6 @@ export default function MapEditor() {
       case 'corridor':
         draw.setMode('polygon');
         break;
-      case 'no_go_zone':
       case 'review':
       case 'idle':
         draw.setMode('select');
@@ -217,6 +217,7 @@ export default function MapEditor() {
     startPointId.current = null;
     endPointId.current = null;
     corridorId.current = null;
+    isDrawingNoGoZone.current = false;
     setPlaced({ start: false, end: false, corridor: false });
     setNoGoZoneIds([]);
   };
@@ -231,13 +232,25 @@ export default function MapEditor() {
       const feature = snapshot.find((f) => f.id === id);
       if (!feature) return;
 
-      if (step === 'start' && feature.geometry.type === 'Point') {
+      if (feature.geometry.type === 'Polygon') {
+        if (isDrawingNoGoZone.current) {
+          isDrawingNoGoZone.current = false;
+          setNoGoZoneIds((prev) => [...prev, id]);
+          draw.setMode('select');
+        } else if (step === 'corridor') {
+          if (corridorId.current != null) {
+            try { draw.removeFeatures([corridorId.current]); } catch { /* noop */ }
+          }
+          corridorId.current = id;
+          setPlaced((p) => ({ ...p, corridor: true }));
+          setStep('review');
+        }
+      } else if (step === 'start' && feature.geometry.type === 'Point') {
         if (startPointId.current != null) {
           try { draw.removeFeatures([startPointId.current]); } catch { /* noop */ }
         }
         startPointId.current = id;
         setPlaced((p) => ({ ...p, start: true }));
-        // Auto-advance: skip end if already placed, skip corridor if already placed
         if (endPointId.current == null) {
           setStep('end');
         } else if (corridorId.current == null) {
@@ -256,16 +269,6 @@ export default function MapEditor() {
         } else {
           setStep('review');
         }
-      } else if (step === 'corridor' && feature.geometry.type === 'Polygon') {
-        if (corridorId.current != null) {
-          try { draw.removeFeatures([corridorId.current]); } catch { /* noop */ }
-        }
-        corridorId.current = id;
-        setPlaced((p) => ({ ...p, corridor: true }));
-        setStep('no_go_zone');
-      } else if (step === 'no_go_zone' && feature.geometry.type === 'Polygon') {
-        setNoGoZoneIds((prev) => [...prev, id]);
-        draw.setMode('select');
       }
     };
 
@@ -513,10 +516,10 @@ export default function MapEditor() {
                   {editingRound !== null ? `Edit Round ${editingRound}` : 'New Round'}
                 </h3>
                 <div className="flex flex-col gap-1">
-                  {(['start', 'end', 'corridor', 'no_go_zone'] as const).map((s) => {
+                  {(['start', 'end', 'corridor'] as const).map((s) => {
                     const info = STEP_INFO[s];
                     const isCurrent = step === s;
-                    const isComplete = s === 'no_go_zone' ? noGoZoneIds.length > 0 : placed[s];
+                    const isComplete = placed[s];
 
                     return (
                       <div key={s} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
@@ -538,9 +541,9 @@ export default function MapEditor() {
                           {isComplete && !isCurrent ? '\u2713' : info.number}
                         </span>
                         <span className="flex-1">{info.label}</span>
-                        {isComplete && !isCurrent && s !== 'no_go_zone' && (
+                        {isComplete && !isCurrent && (
                           <button
-                            onClick={() => redoStep(s as 'start' | 'end' | 'corridor')}
+                            onClick={() => redoStep(s)}
                             className="text-xs text-green-600 hover:text-green-800"
                           >
                             redo
@@ -553,7 +556,7 @@ export default function MapEditor() {
               </div>
 
               {/* Current step instruction */}
-              {step !== 'review' && step !== 'no_go_zone' && (
+              {step !== 'review' && (
                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
                   <p className="text-sm text-blue-800">
                     {STEP_INFO[step].instruction}
@@ -561,46 +564,41 @@ export default function MapEditor() {
                 </div>
               )}
 
-              {/* No-go zone controls */}
-              {step === 'no_go_zone' && (
-                <div className="flex flex-col gap-2">
-                  <div className="bg-red-50 border border-red-100 rounded-lg p-3">
-                    <p className="text-sm text-red-800">
-                      {STEP_INFO.no_go_zone.instruction}
-                    </p>
-                  </div>
+              {/* No-go zone controls — always visible during editing */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-medium text-gray-700">No-Go Zones</span>
                   <button
-                    onClick={() => drawRef.current?.setMode('polygon')}
-                    className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium transition-colors"
+                    onClick={() => {
+                      isDrawingNoGoZone.current = true;
+                      drawRef.current?.setMode('polygon');
+                    }}
+                    className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
                   >
                     + Draw Zone
                   </button>
-                  {noGoZoneIds.length > 0 && (
-                    <div className="flex flex-col gap-1">
-                      {noGoZoneIds.map((id, i) => (
-                        <div key={String(id)} className="flex items-center justify-between bg-red-50 rounded px-3 py-1.5 text-sm">
-                          <span className="text-red-800">Zone {i + 1}</span>
-                          <button
-                            onClick={() => {
-                              try { drawRef.current?.removeFeatures([id]); } catch { /* noop */ }
-                              setNoGoZoneIds((prev) => prev.filter((z) => z !== id));
-                            }}
-                            className="text-red-600 hover:text-red-800 text-xs"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <button
-                    onClick={() => setStep('review')}
-                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition-colors"
-                  >
-                    {noGoZoneIds.length === 0 ? 'Skip (no zones)' : 'Done'}
-                  </button>
                 </div>
-              )}
+                {noGoZoneIds.length === 0 ? (
+                  <p className="text-xs text-gray-400">None added</p>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    {noGoZoneIds.map((id, i) => (
+                      <div key={String(id)} className="flex items-center justify-between bg-red-50 rounded px-2 py-1.5 text-xs">
+                        <span className="text-red-800">Zone {i + 1}</span>
+                        <button
+                          onClick={() => {
+                            try { drawRef.current?.removeFeatures([id]); } catch { /* noop */ }
+                            setNoGoZoneIds((prev) => prev.filter((z) => z !== id));
+                          }}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Round name */}
               <div>
