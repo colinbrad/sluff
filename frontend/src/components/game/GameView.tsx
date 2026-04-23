@@ -231,10 +231,9 @@ export default function GameView() {
 
     // Fit map to start and end points
     if (currentRound.start_point?.coordinates && currentRound.end_point?.coordinates) {
-      const bounds = new maplibregl.LngLatBounds(
-        currentRound.start_point.coordinates as [number, number],
-        currentRound.end_point.coordinates as [number, number]
-      );
+      const bounds = new maplibregl.LngLatBounds();
+      bounds.extend(currentRound.start_point.coordinates as [number, number]);
+      bounds.extend(currentRound.end_point.coordinates as [number, number]);
       map.fitBounds(bounds, { padding: 120, maxZoom: 16, animate: false });
     }
   }, [currentRound, mapReady]);
@@ -264,10 +263,9 @@ export default function GameView() {
       // where the useEffect may fire before mapRef.current is set).
       const cr = currentRoundRef.current;
       if (cr?.start_point?.coordinates && cr?.end_point?.coordinates) {
-        const bounds = new maplibregl.LngLatBounds(
-          cr.start_point.coordinates as [number, number],
-          cr.end_point.coordinates as [number, number]
-        );
+        const bounds = new maplibregl.LngLatBounds();
+        bounds.extend(cr.start_point.coordinates as [number, number]);
+        bounds.extend(cr.end_point.coordinates as [number, number]);
         map.fitBounds(bounds, { padding: 120, maxZoom: 16, animate: false });
       }
 
