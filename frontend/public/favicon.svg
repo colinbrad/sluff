@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Six-pointed snowflake -->
+  <g stroke="#4BA3E3" stroke-linecap="round" fill="none">
+    <!-- Main axes -->
+    <line x1="16" y1="2"  x2="16" y2="30" stroke-width="2.2"/>
+    <line x1="2"  y1="16" x2="30" y2="16" stroke-width="2.2"/>
+    <line x1="5"  y1="5"  x2="27" y2="27" stroke-width="2.2"/>
+    <line x1="27" y1="5"  x2="5"  y2="27" stroke-width="2.2"/>
+    <!-- Top arm branches -->
+    <line x1="16" y1="8"  x2="13" y2="5"  stroke-width="1.6"/>
+    <line x1="16" y1="8"  x2="19" y2="5"  stroke-width="1.6"/>
+    <!-- Bottom arm branches -->
+    <line x1="16" y1="24" x2="13" y2="27" stroke-width="1.6"/>
+    <line x1="16" y1="24" x2="19" y2="27" stroke-width="1.6"/>
+    <!-- Left arm branches -->
+    <line x1="8"  y1="16" x2="5"  y2="13" stroke-width="1.6"/>
+    <line x1="8"  y1="16" x2="5"  y2="19" stroke-width="1.6"/>
+    <!-- Right arm branches -->
+    <line x1="24" y1="16" x2="27" y2="13" stroke-width="1.6"/>
+    <line x1="24" y1="16" x2="27" y2="19" stroke-width="1.6"/>
+    <!-- Diagonal top-right branches -->
+    <line x1="22" y1="10" x2="22" y2="7"  stroke-width="1.6"/>
+    <line x1="22" y1="10" x2="25" y2="10" stroke-width="1.6"/>
+    <!-- Diagonal top-left branches -->
+    <line x1="10" y1="10" x2="10" y2="7"  stroke-width="1.6"/>
+    <line x1="10" y1="10" x2="7"  y2="10" stroke-width="1.6"/>
+    <!-- Diagonal bottom-right branches -->
+    <line x1="22" y1="22" x2="22" y2="25" stroke-width="1.6"/>
+    <line x1="22" y1="22" x2="25" y2="22" stroke-width="1.6"/>
+    <!-- Diagonal bottom-left branches -->
+    <line x1="10" y1="22" x2="10" y2="25" stroke-width="1.6"/>
+    <line x1="10" y1="22" x2="7"  y2="22" stroke-width="1.6"/>
+    <!-- Center dot -->
+    <circle cx="16" cy="16" r="2" fill="#4BA3E3" stroke="none"/>
+  </g>
+</svg>
