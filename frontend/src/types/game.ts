@@ -1,5 +1,11 @@
 export type GamePhase = 'waiting' | 'playing' | 'scoring' | 'finished';
 
+export interface Guide {
+  id: string;
+  username: string;
+  created_at: string;
+}
+
 export interface GameMap {
   id: string;
   name: string;
@@ -23,6 +29,7 @@ export interface Round {
 export interface Session {
   id: string;
   map_id: string;
+  guide_id: string;
   code: string;
   phase: GamePhase;
   current_round: number;

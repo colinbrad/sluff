@@ -9,6 +9,7 @@ type Config struct {
 	Port        string
 	DBPath      string
 	CORSOrigins []string
+	JWTSecret   string
 }
 
 func Load() *Config {
@@ -30,9 +31,15 @@ func Load() *Config {
 		}
 	}
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "sluff-dev-secret-change-in-production"
+	}
+
 	return &Config{
 		Port:        port,
 		DBPath:      dbPath,
 		CORSOrigins: corsOrigins,
+		JWTSecret:   jwtSecret,
 	}
 }

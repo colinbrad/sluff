@@ -4,6 +4,7 @@ import type { Session } from '../../types/game';
 import * as api from '../../services/api';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useGameStore } from '../../stores/gameStore';
+import { useGuideStore } from '../../stores/guideStore';
 import { GameWebSocket } from '../../services/ws';
 import { TEAM_COLORS, TEAM_NAMES } from '../../constants';
 
@@ -13,6 +14,7 @@ export default function WaitingRoom() {
   const player = usePlayerStore((s) => s.player);
   const setPlayer = usePlayerStore((s) => s.setPlayer);
   const setSession = useGameStore((s) => s.setSession);
+  const guide = useGuideStore((s) => s.guide);
   const [session, setLocalSession] = useState<Session | null>(null);
   const [playerName, setPlayerName] = useState('');
   const [, setWs] = useState<GameWebSocket | null>(null);
@@ -226,18 +228,20 @@ export default function WaitingRoom() {
           </div>
         )}
 
-        {/* Start button */}
-        <button
-          onClick={handleStart}
-          disabled={
-            !session.teams?.length ||
-            session.teams.length < 2 ||
-            !session.players?.some((p) => p.team_id)
-          }
-          className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-semibold text-lg transition-colors"
-        >
-          Start Game
-        </button>
+        {/* Start button — only visible to the guide who owns this session */}
+        {guide && guide.id === session.guide_id && (
+          <button
+            onClick={handleStart}
+            disabled={
+              !session.teams?.length ||
+              session.teams.length < 2 ||
+              !session.players?.some((p) => p.team_id)
+            }
+            className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-semibold text-lg transition-colors"
+          >
+            Start Game
+          </button>
+        )}
       </main>
     </div>
   );

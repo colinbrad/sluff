@@ -11,4 +11,8 @@ require (
 	github.com/paulmach/orb v0.12.0
 )
 
-require go.mongodb.org/mongo-driver v1.11.4 // indirect
+require (
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
+	go.mongodb.org/mongo-driver v1.11.4 // indirect
+	golang.org/x/crypto v0.50.0 // indirect
+)

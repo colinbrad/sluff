@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { GameMap } from '../../types/game';
 import * as api from '../../services/api';
+import { useGuideStore } from '../../stores/guideStore';
 import { parseFile, extractRounds } from '../../utils/importGeo';
 
 export default function GuideDashboard() {
@@ -12,6 +13,7 @@ export default function GuideDashboard() {
   const [importError, setImportError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const { guide, clearAuth } = useGuideStore();
 
   useEffect(() => {
     api.listMaps().then((m) => {
@@ -86,13 +88,24 @@ export default function GuideDashboard() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-4xl mx-auto px-4 py-3 sm:py-4 flex items-center justify-between">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Sluff Guide</h1>
-          <button
-            onClick={() => navigate('/')}
-            className="text-sm text-gray-500 hover:text-gray-700 py-1"
-          >
-            Back to Home
-          </button>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Sluff Guide</h1>
+            {guide && <p className="text-sm text-gray-500">{guide.username}</p>}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/')}
+              className="text-sm text-gray-500 hover:text-gray-700 py-1"
+            >
+              Home
+            </button>
+            <button
+              onClick={() => { clearAuth(); navigate('/'); }}
+              className="text-sm text-red-500 hover:text-red-700 py-1"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
       </header>
 
@@ -157,6 +170,12 @@ export default function GuideDashboard() {
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => navigate(`/create?map=${m.id}`)}
+                    className="flex-1 sm:flex-none px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                  >
+                    Create Session
+                  </button>
                   <button
                     onClick={() => navigate(`/guide/maps/${m.id}`)}
                     className="flex-1 sm:flex-none px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"

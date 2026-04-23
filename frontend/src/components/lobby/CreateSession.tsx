@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { GameMap } from '../../types/game';
 import * as api from '../../services/api';
 
@@ -9,14 +9,17 @@ export default function CreateSession() {
   const [timeLimit, setTimeLimit] = useState(300);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     api.listMaps().then((m) => {
       setMaps(m);
-      if (m.length > 0) setSelectedMap(m[0].id);
+      const preselect = searchParams.get('map');
+      const initial = preselect && m.some((x) => x.id === preselect) ? preselect : m[0]?.id ?? '';
+      setSelectedMap(initial);
       setLoading(false);
     });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCreate = async () => {
     if (!selectedMap) return;
@@ -35,7 +38,10 @@ export default function CreateSession() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-start sm:items-center justify-center p-4">
     <div className="max-w-md w-full bg-white rounded-lg shadow p-4 sm:p-6">
-      <h2 className="text-xl font-bold mb-4">Create Game Session</h2>
+      <div className="flex items-center gap-3 mb-4">
+        <button onClick={() => navigate('/guide')} className="text-gray-400 hover:text-gray-600">&larr;</button>
+        <h2 className="text-xl font-bold">Create Game Session</h2>
+      </div>
 
       {maps.length === 0 ? (
         <p className="text-gray-500">

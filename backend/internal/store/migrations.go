@@ -1,6 +1,13 @@
 package store
 
 const schema = `
+CREATE TABLE IF NOT EXISTS guides (
+	id TEXT PRIMARY KEY,
+	username TEXT UNIQUE NOT NULL,
+	password_hash TEXT NOT NULL,
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS game_maps (
 	id TEXT PRIMARY KEY,
 	name TEXT NOT NULL,
@@ -69,4 +76,6 @@ CREATE INDEX IF NOT EXISTS idx_team_routes_round_id ON team_routes(round_id);
 var alterMigrations = []string{
 	"ALTER TABLE sessions ADD COLUMN is_solo INTEGER NOT NULL DEFAULT 0",
 	"ALTER TABLE rounds ADD COLUMN no_go_zones TEXT NOT NULL DEFAULT '[]'",
+	"ALTER TABLE game_maps ADD COLUMN guide_id TEXT REFERENCES guides(id)",
+	"ALTER TABLE sessions ADD COLUMN guide_id TEXT REFERENCES guides(id)",
 }

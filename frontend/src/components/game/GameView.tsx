@@ -13,16 +13,19 @@ import * as api from '../../services/api';
 import { addRoundMarkers, addNoGoZoneLayers, removeNoGoZoneLayers } from '../../utils/mapUtils';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useGameStore } from '../../stores/gameStore';
+import { useGuideStore } from '../../stores/guideStore';
 import { GameWebSocket } from '../../services/ws';
 import GameMapComponent from '../map/GameMap';
 import MapOverlayControls from '../map/MapOverlayControls';
 import GameHeader from './GameHeader';
 import RoundReview from './RoundReview';
+import GuideSessionControls from './GuideSessionControls';
 
 export default function GameView() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const player = usePlayerStore((s) => s.player);
+  const guide = useGuideStore((s) => s.guide);
   const {
     session,
     currentRound,
@@ -63,6 +66,7 @@ export default function GameView() {
   const markersRef = useRef<maplibregl.Marker[]>([]);
 
   const isSolo = session?.is_solo ?? false;
+  const isGuide = !!guide && session?.guide_id === guide.id;
 
   // Fetch session on mount
   useEffect(() => {
@@ -425,6 +429,21 @@ export default function GameView() {
           onToggleTerrain={() => setTerrain3d((v) => !v)}
           onToggleSlope={() => setSlopeShading((v) => !v)}
         />
+
+        {isGuide && sessionId && (
+          <GuideSessionControls
+            sessionId={sessionId}
+            players={session?.players ?? []}
+            teams={session?.teams ?? []}
+            routeResults={routeResults}
+            currentRound={currentRound}
+            phase={phase ?? 'waiting'}
+            onAdvanceRound={handleScoreContinue}
+            onRefreshSession={() => {
+              api.getSession(sessionId).then((s) => setSession(s));
+            }}
+          />
+        )}
 
         {/* Submit button */}
         {phase === 'playing' && !submitted && (

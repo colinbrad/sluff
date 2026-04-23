@@ -13,6 +13,7 @@ type GameMap struct {
 	ID          string    `json:"id"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
+	GuideID     string    `json:"guide_id,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	Rounds      []Round   `json:"rounds,omitempty"`

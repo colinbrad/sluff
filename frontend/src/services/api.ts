@@ -1,7 +1,13 @@
-import type { GameMap, Round, Session, Player, Team, TeamRoute } from '../types/game';
+import type { GameMap, Guide, Round, Session, Player, Team, TeamRoute } from '../types/game';
+import { useGuideStore } from '../stores/guideStore';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 const BASE = `${API_URL}/api`;
+
+function authHeaders(): HeadersInit {
+  const token = useGuideStore.getState().token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -18,27 +24,57 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
-// Guide - Maps
+// Authenticated request — includes Bearer token header
+function authRequest<T>(path: string, options?: RequestInit): Promise<T> {
+  return request<T>(path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(),
+      ...(options?.headers as Record<string, string> | undefined),
+    },
+  });
+}
+
+// Auth
+export interface AuthResponse {
+  token: string;
+  guide: Guide;
+}
+
+export const registerGuide = (username: string, password: string) =>
+  request<AuthResponse>('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  });
+
+export const loginGuide = (username: string, password: string) =>
+  request<AuthResponse>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  });
+
+// Guide - Maps (auth required)
 export const createMap = (name: string, description: string) =>
-  request<GameMap>('/guide/maps', {
+  authRequest<GameMap>('/guide/maps', {
     method: 'POST',
     body: JSON.stringify({ name, description }),
   });
 
-export const listMaps = () => request<GameMap[]>('/guide/maps');
+export const listMaps = () => authRequest<GameMap[]>('/guide/maps');
 
-export const getMap = (id: string) => request<GameMap>(`/guide/maps/${id}`);
+export const getMap = (id: string) => authRequest<GameMap>(`/guide/maps/${id}`);
 
 export const updateMap = (id: string, data: { name?: string; description?: string }) =>
-  request<GameMap>(`/guide/maps/${id}`, {
+  authRequest<GameMap>(`/guide/maps/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
 
 export const deleteMap = (id: string) =>
-  request<void>(`/guide/maps/${id}`, { method: 'DELETE' });
+  authRequest<void>(`/guide/maps/${id}`, { method: 'DELETE' });
 
-// Guide - Rounds
+// Guide - Rounds (auth required)
 export const createRound = (mapId: string, data: {
   round_number: number;
   name: string;
@@ -46,7 +82,7 @@ export const createRound = (mapId: string, data: {
   end_point: GeoJSON.Geometry;
   corridor: GeoJSON.Geometry;
 }) =>
-  request<Round>(`/guide/maps/${mapId}/rounds`, {
+  authRequest<Round>(`/guide/maps/${mapId}/rounds`, {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -58,17 +94,17 @@ export const updateRound = (mapId: string, roundId: string, data: Partial<{
   end_point: GeoJSON.Geometry;
   corridor: GeoJSON.Geometry;
 }>) =>
-  request<Round>(`/guide/maps/${mapId}/rounds/${roundId}`, {
+  authRequest<Round>(`/guide/maps/${mapId}/rounds/${roundId}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
 
 export const deleteRound = (mapId: string, roundId: string) =>
-  request<void>(`/guide/maps/${mapId}/rounds/${roundId}`, { method: 'DELETE' });
+  authRequest<void>(`/guide/maps/${mapId}/rounds/${roundId}`, { method: 'DELETE' });
 
-// Sessions
+// Sessions (create requires auth)
 export const createSession = (mapId: string, timeLimitSec?: number) =>
-  request<Session>('/sessions', {
+  authRequest<Session>('/sessions', {
     method: 'POST',
     body: JSON.stringify({ map_id: mapId, time_limit_sec: timeLimitSec }),
   });
@@ -97,7 +133,7 @@ export const joinTeam = (sessionId: string, teamId: string, playerId: string) =>
   });
 
 export const startGame = (sessionId: string) =>
-  request<Session>(`/sessions/${sessionId}/start`, { method: 'POST' });
+  authRequest<Session>(`/sessions/${sessionId}/start`, { method: 'POST' });
 
 export const submitRoute = (sessionId: string, roundId: string, teamId: string, path: GeoJSON.Geometry) =>
   request<TeamRoute>(`/sessions/${sessionId}/rounds/${roundId}/submit`, {
@@ -108,7 +144,7 @@ export const submitRoute = (sessionId: string, roundId: string, teamId: string, 
 export const getScores = (sessionId: string, roundId: string) =>
   request<TeamRoute[]>(`/sessions/${sessionId}/rounds/${roundId}/scores`);
 
-// Solo mode
+// Solo mode (auth required)
 export interface SoloSessionResponse {
   session: Session;
   player: Player;
@@ -116,7 +152,14 @@ export interface SoloSessionResponse {
 }
 
 export const createSoloSession = (mapId: string, playerName: string, timeLimitSec?: number) =>
-  request<SoloSessionResponse>('/sessions/solo', {
+  authRequest<SoloSessionResponse>('/sessions/solo', {
     method: 'POST',
     body: JSON.stringify({ map_id: mapId, player_name: playerName, time_limit_sec: timeLimitSec }),
   });
+
+// Guide admin actions
+export const kickPlayer = (sessionId: string, playerId: string) =>
+  authRequest<void>(`/sessions/${sessionId}/players/${playerId}`, { method: 'DELETE' });
+
+export const clearRoute = (sessionId: string, roundId: string, teamId: string) =>
+  authRequest<void>(`/sessions/${sessionId}/rounds/${roundId}/routes/${teamId}`, { method: 'DELETE' });

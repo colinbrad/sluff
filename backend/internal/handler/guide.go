@@ -11,9 +11,15 @@ import (
 	"github.com/paulmach/orb"
 	"github.com/paulmach/orb/geojson"
 
+	"github.com/colinbradley/sluff/internal/middleware"
 	"github.com/colinbradley/sluff/internal/model"
 	"github.com/colinbradley/sluff/internal/store"
 )
+
+// guideIDFromCtx extracts the authenticated guide ID from the request context.
+func guideIDFromCtx(r *http.Request) string {
+	return middleware.GuideIDFromContext(r.Context())
+}
 
 type GuideHandler struct {
 	store store.Store
@@ -42,6 +48,7 @@ func (h *GuideHandler) CreateMap(w http.ResponseWriter, r *http.Request) {
 		ID:          uuid.New().String(),
 		Name:        req.Name,
 		Description: req.Description,
+		GuideID:     guideIDFromCtx(r),
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -55,7 +62,8 @@ func (h *GuideHandler) CreateMap(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *GuideHandler) ListMaps(w http.ResponseWriter, r *http.Request) {
-	maps, err := h.store.ListMaps()
+	guideID := guideIDFromCtx(r)
+	maps, err := h.store.ListMapsByGuide(guideID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list maps")
 		return

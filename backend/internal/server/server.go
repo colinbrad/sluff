@@ -5,11 +5,12 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
 	"github.com/colinbradley/sluff/internal/config"
 	"github.com/colinbradley/sluff/internal/handler"
+	"github.com/colinbradley/sluff/internal/middleware"
 	"github.com/colinbradley/sluff/internal/store"
 	"github.com/colinbradley/sluff/internal/ws"
 )
@@ -37,13 +38,13 @@ func New(s store.Store, cfg *config.Config) *Server {
 }
 
 func (s *Server) setupMiddleware() {
-	s.router.Use(middleware.Logger)
-	s.router.Use(middleware.Recoverer)
-	s.router.Use(middleware.RequestID)
+	s.router.Use(chimw.Logger)
+	s.router.Use(chimw.Recoverer)
+	s.router.Use(chimw.RequestID)
 	s.router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   s.cfg.CORSOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Content-Type"},
+		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
@@ -54,14 +55,23 @@ func (s *Server) setupRoutes() {
 	sessionH := handler.NewSessionHandler(s.store)
 	gameH := handler.NewGameHandler(s.store, s.hub)
 	wsH := handler.NewWSHandler(s.store, s.hub)
+	authH := handler.NewAuthHandler(s.store, s.cfg.JWTSecret)
+	adminH := handler.NewGuideAdminHandler(s.store, s.hub)
+
+	guideAuth := middleware.GuideAuth(s.cfg.JWTSecret)
 
 	s.router.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// Guide endpoints
+	// Auth endpoints (public)
+	s.router.Post("/api/auth/register", authH.Register)
+	s.router.Post("/api/auth/login", authH.Login)
+
+	// Guide map management (requires auth)
 	s.router.Route("/api/guide/maps", func(r chi.Router) {
+		r.Use(guideAuth)
 		r.Post("/", guideH.CreateMap)
 		r.Get("/", guideH.ListMaps)
 		r.Get("/{mapID}", guideH.GetMap)
@@ -72,22 +82,28 @@ func (s *Server) setupRoutes() {
 		r.Delete("/{mapID}/rounds/{roundID}", guideH.DeleteRound)
 	})
 
-	// Player-facing map listing
-	s.router.Get("/api/maps", guideH.ListMaps)
-
 	// Session endpoints
 	s.router.Route("/api/sessions", func(r chi.Router) {
-		r.Post("/", sessionH.CreateSession)
-		r.Post("/solo", sessionH.CreateSoloSession)
+		// Guide-only: create sessions
+		r.With(guideAuth).Post("/", sessionH.CreateSession)
+		r.With(guideAuth).Post("/solo", sessionH.CreateSoloSession)
+
+		// Public: join/observe
 		r.Get("/{sessionID}", sessionH.GetSession)
 		r.Get("/code/{code}", sessionH.GetSessionByCode)
 		r.Post("/{sessionID}/join", sessionH.JoinSession)
 		r.Post("/{sessionID}/teams", sessionH.CreateTeam)
 		r.Post("/{sessionID}/teams/{teamID}/join", sessionH.JoinTeam)
-		r.Post("/{sessionID}/start", gameH.StartGame)
+		r.Get("/{sessionID}/ws", wsH.HandleWebSocket)
+
+		// Guide-only: game control
+		r.With(guideAuth).Post("/{sessionID}/start", gameH.StartGame)
+		r.With(guideAuth).Delete("/{sessionID}/players/{playerID}", adminH.KickPlayer)
+		r.With(guideAuth).Delete("/{sessionID}/rounds/{roundID}/routes/{teamID}", adminH.ClearRoute)
+
+		// Scoring (public — players submit their own routes)
 		r.Post("/{sessionID}/rounds/{roundID}/submit", gameH.SubmitRoute)
 		r.Get("/{sessionID}/rounds/{roundID}/scores", gameH.GetScores)
-		r.Get("/{sessionID}/ws", wsH.HandleWebSocket)
 	})
 }
 

@@ -4,10 +4,15 @@ import "github.com/colinbradley/sluff/internal/model"
 
 // Store defines all data access operations.
 type Store interface {
+	// Guides
+	CreateGuide(g *model.Guide) error
+	GetGuideByUsername(username string) (*model.Guide, error)
+	GetGuideByID(id string) (*model.Guide, error)
+
 	// Maps
 	CreateMap(m *model.GameMap) error
 	GetMap(id string) (*model.GameMap, error)
-	ListMaps() ([]model.GameMap, error)
+	ListMapsByGuide(guideID string) ([]model.GameMap, error)
 	UpdateMap(m *model.GameMap) error
 	DeleteMap(id string) error
 
@@ -39,6 +44,10 @@ type Store interface {
 	GetTeamRoute(roundID, teamID string) (*model.TeamRoute, error)
 	GetRoutesByRound(roundID string) ([]model.TeamRoute, error)
 	UpdateTeamRouteScore(id string, score float64, details string) error
+	DeleteTeamRoute(roundID, teamID string) error
+
+	// Player removal
+	DeletePlayer(id string) error
 
 	Close() error
 }

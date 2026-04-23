@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom';
+import { useGuideStore } from '../stores/guideStore';
 
 export default function Home() {
   const navigate = useNavigate();
+  const guide = useGuideStore((s) => s.guide);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
@@ -13,28 +15,16 @@ export default function Home() {
 
         <div className="flex flex-col gap-3 sm:gap-4">
           <button
-            onClick={() => navigate('/solo')}
-            className="px-6 py-3 sm:px-8 sm:py-4 bg-green-600 text-white rounded-xl text-base sm:text-lg font-semibold hover:bg-green-700 shadow-lg transition-colors"
-          >
-            Solo Play
-          </button>
-          <button
             onClick={() => navigate('/join')}
             className="px-6 py-3 sm:px-8 sm:py-4 bg-blue-600 text-white rounded-xl text-base sm:text-lg font-semibold hover:bg-blue-700 shadow-lg transition-colors"
           >
             Join Game
           </button>
           <button
-            onClick={() => navigate('/create')}
+            onClick={() => navigate(guide ? '/guide' : '/guide/login')}
             className="px-6 py-3 sm:px-8 sm:py-4 bg-white text-gray-700 rounded-xl text-base sm:text-lg font-semibold hover:bg-gray-50 shadow border transition-colors"
           >
-            Create Session
-          </button>
-          <button
-            onClick={() => navigate('/guide')}
-            className="px-6 py-3 sm:px-8 text-gray-500 hover:text-gray-700 text-sm transition-colors"
-          >
-            Guide Panel
+            {guide ? `Guide Panel (${guide.username})` : 'Guide Sign In'}
           </button>
         </div>
       </div>

@@ -17,6 +17,7 @@ const (
 type Session struct {
 	ID           string    `json:"id"`
 	MapID        string    `json:"map_id"`
+	GuideID      string    `json:"guide_id"`
 	Code         string    `json:"code"`
 	Phase        GamePhase `json:"phase"`
 	CurrentRound int       `json:"current_round"`

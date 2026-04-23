@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/colinbradley/sluff/internal/middleware"
 	"github.com/colinbradley/sluff/internal/model"
 	"github.com/colinbradley/sluff/internal/store"
 )
@@ -51,6 +52,7 @@ func (h *SessionHandler) CreateSession(w http.ResponseWriter, r *http.Request) {
 	sess := &model.Session{
 		ID:           uuid.New().String(),
 		MapID:        req.MapID,
+		GuideID:      middleware.GuideIDFromContext(r.Context()),
 		Code:         generateCode(6),
 		Phase:        model.PhaseWaiting,
 		CurrentRound: 0,
@@ -247,6 +249,7 @@ func (h *SessionHandler) CreateSoloSession(w http.ResponseWriter, r *http.Reques
 	sess := &model.Session{
 		ID:           uuid.New().String(),
 		MapID:        req.MapID,
+		GuideID:      middleware.GuideIDFromContext(r.Context()),
 		Code:         generateCode(6),
 		Phase:        model.PhaseWaiting,
 		CurrentRound: 0,

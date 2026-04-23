@@ -3,10 +3,15 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"log"
+	"os"
 	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	"golang.org/x/crypto/bcrypt"
+
+	"github.com/google/uuid"
 
 	"github.com/colinbradley/sluff/internal/model"
 	"github.com/paulmach/orb/geojson"
@@ -32,27 +37,105 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 		}
 	}
 
+	if err := seedDefaultGuide(db); err != nil {
+		return nil, fmt.Errorf("seed default guide: %w", err)
+	}
+
 	return &SQLiteStore{db: db}, nil
+}
+
+// seedDefaultGuide creates a default guide account if none exist, and assigns
+// all existing un-owned maps and sessions to it.
+func seedDefaultGuide(db *sql.DB) error {
+	var count int
+	if err := db.QueryRow("SELECT COUNT(*) FROM guides").Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+
+	username := os.Getenv("DEFAULT_GUIDE_USERNAME")
+	if username == "" {
+		username = "admin"
+	}
+	password := os.Getenv("DEFAULT_GUIDE_PASSWORD")
+	if password == "" {
+		password = "sluff"
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	id := uuid.New().String()
+	if _, err := db.Exec(
+		"INSERT INTO guides (id, username, password_hash, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+		id, username, string(hash),
+	); err != nil {
+		return err
+	}
+
+	db.Exec("UPDATE game_maps SET guide_id = ? WHERE guide_id IS NULL", id)
+	db.Exec("UPDATE sessions SET guide_id = ? WHERE guide_id IS NULL", id)
+
+	log.Printf("Created default guide: username=%q password=%q", username, password)
+	return nil
 }
 
 func (s *SQLiteStore) Close() error {
 	return s.db.Close()
 }
 
+// --- Guides ---
+
+func (s *SQLiteStore) CreateGuide(g *model.Guide) error {
+	_, err := s.db.Exec(
+		"INSERT INTO guides (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
+		g.ID, g.Username, g.PasswordHash, g.CreatedAt,
+	)
+	return err
+}
+
+func (s *SQLiteStore) GetGuideByUsername(username string) (*model.Guide, error) {
+	g := &model.Guide{}
+	err := s.db.QueryRow("SELECT id, username, password_hash, created_at FROM guides WHERE username = ?", username).
+		Scan(&g.ID, &g.Username, &g.PasswordHash, &g.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return g, err
+}
+
+func (s *SQLiteStore) GetGuideByID(id string) (*model.Guide, error) {
+	g := &model.Guide{}
+	err := s.db.QueryRow("SELECT id, username, password_hash, created_at FROM guides WHERE id = ?", id).
+		Scan(&g.ID, &g.Username, &g.PasswordHash, &g.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return g, err
+}
+
 // --- Maps ---
 
 func (s *SQLiteStore) CreateMap(m *model.GameMap) error {
 	_, err := s.db.Exec(
-		"INSERT INTO game_maps (id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-		m.ID, m.Name, m.Description, m.CreatedAt, m.UpdatedAt,
+		"INSERT INTO game_maps (id, name, description, guide_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+		m.ID, m.Name, m.Description, m.GuideID, m.CreatedAt, m.UpdatedAt,
 	)
 	return err
 }
 
 func (s *SQLiteStore) GetMap(id string) (*model.GameMap, error) {
 	m := &model.GameMap{}
-	err := s.db.QueryRow("SELECT id, name, description, created_at, updated_at FROM game_maps WHERE id = ?", id).
-		Scan(&m.ID, &m.Name, &m.Description, &m.CreatedAt, &m.UpdatedAt)
+	var guideID sql.NullString
+	err := s.db.QueryRow("SELECT id, name, description, guide_id, created_at, updated_at FROM game_maps WHERE id = ?", id).
+		Scan(&m.ID, &m.Name, &m.Description, &guideID, &m.CreatedAt, &m.UpdatedAt)
+	if guideID.Valid {
+		m.GuideID = guideID.String
+	}
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -68,8 +151,11 @@ func (s *SQLiteStore) GetMap(id string) (*model.GameMap, error) {
 	return m, nil
 }
 
-func (s *SQLiteStore) ListMaps() ([]model.GameMap, error) {
-	rows, err := s.db.Query("SELECT id, name, description, created_at, updated_at FROM game_maps ORDER BY created_at DESC")
+func (s *SQLiteStore) ListMapsByGuide(guideID string) ([]model.GameMap, error) {
+	rows, err := s.db.Query(
+		"SELECT id, name, description, guide_id, created_at, updated_at FROM game_maps WHERE guide_id = ? ORDER BY created_at DESC",
+		guideID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -77,15 +163,18 @@ func (s *SQLiteStore) ListMaps() ([]model.GameMap, error) {
 	var maps []model.GameMap
 	for rows.Next() {
 		var m model.GameMap
-		if err := rows.Scan(&m.ID, &m.Name, &m.Description, &m.CreatedAt, &m.UpdatedAt); err != nil {
+		var gid sql.NullString
+		if err := rows.Scan(&m.ID, &m.Name, &m.Description, &gid, &m.CreatedAt, &m.UpdatedAt); err != nil {
 			rows.Close()
 			return nil, err
+		}
+		if gid.Valid {
+			m.GuideID = gid.String
 		}
 		maps = append(maps, m)
 	}
 	rows.Close()
 
-	// Load rounds after closing the rows cursor to avoid SQLite connection contention
 	for i := range maps {
 		rounds, err := s.GetRoundsByMap(maps[i].ID)
 		if err != nil {
@@ -197,21 +286,25 @@ func (s *SQLiteStore) DeleteRound(id string) error {
 
 func (s *SQLiteStore) CreateSession(sess *model.Session) error {
 	_, err := s.db.Exec(
-		"INSERT INTO sessions (id, map_id, code, phase, current_round, time_limit_sec, is_solo, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		sess.ID, sess.MapID, sess.Code, sess.Phase, sess.CurrentRound, sess.TimeLimitSec, sess.IsSolo, sess.CreatedAt,
+		"INSERT INTO sessions (id, map_id, guide_id, code, phase, current_round, time_limit_sec, is_solo, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		sess.ID, sess.MapID, sess.GuideID, sess.Code, sess.Phase, sess.CurrentRound, sess.TimeLimitSec, sess.IsSolo, sess.CreatedAt,
 	)
 	return err
 }
 
 func (s *SQLiteStore) GetSession(id string) (*model.Session, error) {
 	sess := &model.Session{}
-	err := s.db.QueryRow("SELECT id, map_id, code, phase, current_round, time_limit_sec, is_solo, created_at FROM sessions WHERE id = ?", id).
-		Scan(&sess.ID, &sess.MapID, &sess.Code, &sess.Phase, &sess.CurrentRound, &sess.TimeLimitSec, &sess.IsSolo, &sess.CreatedAt)
+	var guideID sql.NullString
+	err := s.db.QueryRow("SELECT id, map_id, guide_id, code, phase, current_round, time_limit_sec, is_solo, created_at FROM sessions WHERE id = ?", id).
+		Scan(&sess.ID, &sess.MapID, &guideID, &sess.Code, &sess.Phase, &sess.CurrentRound, &sess.TimeLimitSec, &sess.IsSolo, &sess.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	if guideID.Valid {
+		sess.GuideID = guideID.String
 	}
 
 	teams, err := s.GetTeamsBySession(id)
@@ -390,5 +483,15 @@ func (s *SQLiteStore) GetRoutesByRound(roundID string) ([]model.TeamRoute, error
 
 func (s *SQLiteStore) UpdateTeamRouteScore(id string, score float64, details string) error {
 	_, err := s.db.Exec("UPDATE team_routes SET score = ?, details = ? WHERE id = ?", score, details, id)
+	return err
+}
+
+func (s *SQLiteStore) DeleteTeamRoute(roundID, teamID string) error {
+	_, err := s.db.Exec("DELETE FROM team_routes WHERE round_id = ? AND team_id = ?", roundID, teamID)
+	return err
+}
+
+func (s *SQLiteStore) DeletePlayer(id string) error {
+	_, err := s.db.Exec("DELETE FROM players WHERE id = ?", id)
 	return err
 }
