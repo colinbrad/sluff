@@ -443,24 +443,11 @@ export default function GameView() {
       />
 
       <div className="flex-1 relative">
-        {!currentRound ? (
-          <div className="w-full h-full flex items-center justify-center bg-gray-900">
+        <GameMapComponent onMapReady={initDraw} terrain3d={terrain3d} slopeShading={slopeShading} />
+        {!currentRound && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
             <div className="text-gray-400">Loading round...</div>
           </div>
-        ) : (
-          <GameMapComponent
-            onMapReady={initDraw}
-            terrain3d={terrain3d}
-            slopeShading={slopeShading}
-            center={
-              currentRound.start_point?.coordinates && currentRound.end_point?.coordinates
-                ? [
-                    (currentRound.start_point.coordinates[0] + currentRound.end_point.coordinates[0]) / 2,
-                    (currentRound.start_point.coordinates[1] + currentRound.end_point.coordinates[1]) / 2,
-                  ] as [number, number]
-                : undefined
-            }
-          />
         )}
         <MapOverlayControls
           terrain3d={terrain3d}
