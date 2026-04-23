@@ -235,7 +235,7 @@ export default function GameView() {
         currentRound.start_point.coordinates as [number, number],
         currentRound.end_point.coordinates as [number, number]
       );
-      map.fitBounds(bounds, { padding: 120, maxZoom: 16 });
+      map.fitBounds(bounds, { padding: 120, maxZoom: 16, animate: false });
     }
   }, [currentRound, mapReady]);
 
@@ -268,7 +268,7 @@ export default function GameView() {
           cr.start_point.coordinates as [number, number],
           cr.end_point.coordinates as [number, number]
         );
-        map.fitBounds(bounds, { padding: 120, maxZoom: 16 });
+        map.fitBounds(bounds, { padding: 120, maxZoom: 16, animate: false });
       }
 
       const draw = new TerraDraw({
@@ -443,7 +443,25 @@ export default function GameView() {
       />
 
       <div className="flex-1 relative">
-        <GameMapComponent onMapReady={initDraw} terrain3d={terrain3d} slopeShading={slopeShading} />
+        {!currentRound ? (
+          <div className="w-full h-full flex items-center justify-center bg-gray-900">
+            <div className="text-gray-400">Loading round...</div>
+          </div>
+        ) : (
+          <GameMapComponent
+            onMapReady={initDraw}
+            terrain3d={terrain3d}
+            slopeShading={slopeShading}
+            center={
+              currentRound.start_point?.coordinates && currentRound.end_point?.coordinates
+                ? [
+                    (currentRound.start_point.coordinates[0] + currentRound.end_point.coordinates[0]) / 2,
+                    (currentRound.start_point.coordinates[1] + currentRound.end_point.coordinates[1]) / 2,
+                  ] as [number, number]
+                : undefined
+            }
+          />
+        )}
         <MapOverlayControls
           terrain3d={terrain3d}
           slopeShading={slopeShading}
