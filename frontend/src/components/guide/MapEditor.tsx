@@ -206,7 +206,7 @@ export default function MapEditor() {
     setNoGoZoneIds([]);
   };
 
-  // Ctrl/Cmd+Z — undo the last polygon vertex while drawing
+  // Ctrl/Cmd+Z — undo the last polygon vertex while drawing.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.key !== 'z') return;

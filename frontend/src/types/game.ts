@@ -29,7 +29,7 @@ export interface Round {
 export interface Session {
   id: string;
   map_id: string;
-  guide_id: string;
+  guide_id?: string;
   code: string;
   phase: GamePhase;
   current_round: number;

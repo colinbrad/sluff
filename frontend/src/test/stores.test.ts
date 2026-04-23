@@ -21,6 +21,7 @@ describe('gameStore', () => {
     const session: Session = {
       id: 's1',
       map_id: 'm1',
+      guide_id: 'g1',
       code: 'ABC123',
       phase: 'waiting',
       current_round: 0,
