@@ -163,7 +163,10 @@ func (h *GameHandler) GetScores(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, routes)
 }
 
-func mustMarshal(v interface{}) json.RawMessage {
-	b, _ := json.Marshal(v)
+func mustMarshal(v any) json.RawMessage {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
 	return b
 }

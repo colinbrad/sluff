@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import type { Team, TeamRoute, ScoreDetails, Round } from '../../types/game';
+import { TEAM_COLORS } from '../../constants';
+import { addRoundMarkers, addNoGoZoneLayers } from '../../utils/mapUtils';
+import GameMapComponent from '../map/GameMap';
 
 interface RoundReviewProps {
   teamScores: Array<{ team_id: string; score: ScoreDetails }>;
@@ -10,8 +13,6 @@ interface RoundReviewProps {
   onNextRound: () => void;
 }
 
-const TEAM_COLORS_FALLBACK = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
-
 export default function RoundReview({
   teamScores,
   routeResults,
@@ -19,7 +20,6 @@ export default function RoundReview({
   currentRound,
   onNextRound,
 }: RoundReviewProps) {
-  const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
@@ -31,61 +31,10 @@ export default function RoundReview({
 
   const getTeamColor = (teamId: string, index: number) => {
     const team = getTeam(teamId);
-    return team?.color || TEAM_COLORS_FALLBACK[index % TEAM_COLORS_FALLBACK.length];
+    return team?.color || TEAM_COLORS[index % TEAM_COLORS.length];
   };
 
-  // Initialize map
-  useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) return;
-
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: {
-        version: 8,
-        sources: {
-          opentopomap: {
-            type: 'raster',
-            tiles: [
-              'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
-              'https://b.tile.opentopomap.org/{z}/{x}/{y}.png',
-              'https://c.tile.opentopomap.org/{z}/{x}/{y}.png',
-            ],
-            tileSize: 256,
-            attribution:
-              '&copy; <a href="https://opentopomap.org">OpenTopoMap</a> contributors',
-          },
-        },
-        layers: [
-          {
-            id: 'opentopomap',
-            type: 'raster',
-            source: 'opentopomap',
-            minzoom: 0,
-            maxzoom: 17,
-          },
-        ],
-      },
-      center: [-111.5, 40.6],
-      zoom: 12,
-      maxZoom: 17,
-    });
-
-    map.addControl(new maplibregl.NavigationControl(), 'top-right');
-
-    map.on('load', () => {
-      setMapLoaded(true);
-    });
-
-    mapRef.current = map;
-
-    return () => {
-      map.remove();
-      mapRef.current = null;
-      setMapLoaded(false);
-    };
-  }, []);
-
-  // Add routes to map once loaded
+  // Add routes, markers, and no-go zones once the map is ready
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return;
     const map = mapRef.current;
@@ -93,58 +42,31 @@ export default function RoundReview({
     const bounds = new maplibregl.LngLatBounds();
     let hasBounds = false;
 
-    // Add no-go zones
-    for (let i = 0; i < (currentRound?.no_go_zones?.length ?? 0); i++) {
-      const zone = currentRound!.no_go_zones![i];
-      const srcId = `review-nogo-${i}`;
-      map.addSource(srcId, {
-        type: 'geojson',
-        data: { type: 'Feature', geometry: zone, properties: {} },
-      });
-      map.addLayer({
-        id: srcId + '-fill',
-        type: 'fill',
-        source: srcId,
-        paint: { 'fill-color': '#EF4444', 'fill-opacity': 0.25 },
-      });
-      map.addLayer({
-        id: srcId + '-outline',
-        type: 'line',
-        source: srcId,
-        paint: { 'line-color': '#EF4444', 'line-width': 2, 'line-dasharray': [3, 2] },
-      });
+    if (currentRound?.no_go_zones?.length) {
+      addNoGoZoneLayers(map, currentRound.no_go_zones, 'review-nogo');
     }
 
-    // Add start/end markers from the round
-    if (currentRound?.start_point?.coordinates) {
-      new maplibregl.Marker({ color: '#10B981' })
-        .setLngLat(currentRound.start_point.coordinates as [number, number])
-        .setPopup(new maplibregl.Popup().setText('Start'))
-        .addTo(map);
-      bounds.extend(currentRound.start_point.coordinates as [number, number]);
-      hasBounds = true;
-    }
-    if (currentRound?.end_point?.coordinates) {
-      new maplibregl.Marker({ color: '#EF4444' })
-        .setLngLat(currentRound.end_point.coordinates as [number, number])
-        .setPopup(new maplibregl.Popup().setText('End'))
-        .addTo(map);
-      bounds.extend(currentRound.end_point.coordinates as [number, number]);
-      hasBounds = true;
+    if (currentRound) {
+      const markers = addRoundMarkers(map, currentRound);
+      if (currentRound.start_point?.coordinates) {
+        bounds.extend(currentRound.start_point.coordinates as [number, number]);
+        hasBounds = true;
+      }
+      if (currentRound.end_point?.coordinates) {
+        bounds.extend(currentRound.end_point.coordinates as [number, number]);
+        hasBounds = true;
+      }
+      // Markers don't need cleanup — they're removed with the map on unmount
+      void markers;
     }
 
-    // Add each team's route as a line layer
     routeResults.forEach((route, index) => {
       let geojson: GeoJSON.LineString;
       try {
-        geojson =
-          typeof route.path === 'string'
-            ? JSON.parse(route.path)
-            : route.path;
+        geojson = typeof route.path === 'string' ? JSON.parse(route.path) : route.path;
       } catch {
         return;
       }
-
       if (geojson.type !== 'LineString' || !geojson.coordinates?.length) return;
 
       const color = getTeamColor(route.team_id, index);
@@ -153,48 +75,31 @@ export default function RoundReview({
 
       map.addSource(sourceId, {
         type: 'geojson',
-        data: {
-          type: 'Feature',
-          properties: {},
-          geometry: geojson,
-        },
+        data: { type: 'Feature', properties: {}, geometry: geojson },
       });
-
-      // Outline for contrast
       map.addLayer({
         id: `${layerId}-outline`,
         type: 'line',
         source: sourceId,
-        paint: {
-          'line-color': '#000000',
-          'line-width': 6,
-          'line-opacity': 0.3,
-        },
+        paint: { 'line-color': '#000000', 'line-width': 6, 'line-opacity': 0.3 },
       });
-
       map.addLayer({
         id: layerId,
         type: 'line',
         source: sourceId,
-        paint: {
-          'line-color': color,
-          'line-width': 4,
-          'line-opacity': 0.9,
-        },
+        paint: { 'line-color': color, 'line-width': 4, 'line-opacity': 0.9 },
       });
 
-      // Extend bounds to include route coordinates
       for (const coord of geojson.coordinates) {
         bounds.extend(coord as [number, number]);
         hasBounds = true;
       }
     });
 
-    // Fit map to show all routes
     if (hasBounds) {
       map.fitBounds(bounds, { padding: 60, maxZoom: 15 });
     }
-  }, [mapLoaded, routeResults, currentRound]);
+  }, [mapLoaded, routeResults, currentRound]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="h-screen flex flex-col bg-gray-900">
@@ -213,7 +118,12 @@ export default function RoundReview({
       <div className="flex-1 flex flex-col md:flex-row min-h-0">
         {/* Map */}
         <div className="flex-1 relative min-h-[40vh] md:min-h-0">
-          <div ref={mapContainerRef} className="w-full h-full" />
+          <GameMapComponent
+            onMapReady={(map) => {
+              mapRef.current = map;
+              setMapLoaded(true);
+            }}
+          />
 
           {/* Route legend overlay */}
           <div className="absolute bottom-2 left-2 sm:bottom-4 sm:left-4 bg-gray-900/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 space-y-1 sm:space-y-1.5">

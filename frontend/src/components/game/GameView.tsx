@@ -10,6 +10,7 @@ import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import type { Round } from '../../types/game';
 import type { GameStatePayload, CursorUpdatePayload, DrawingUpdateFromServer, ScoresPayload } from '../../types/messages';
 import * as api from '../../services/api';
+import { addRoundMarkers, addNoGoZoneLayers, removeNoGoZoneLayers } from '../../utils/mapUtils';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useGameStore } from '../../stores/gameStore';
 import { GameWebSocket } from '../../services/ws';
@@ -181,53 +182,16 @@ export default function GameView() {
     markersRef.current = [];
 
     // Remove previous no-go zone layers/sources
-    for (const id of noGoLayerIdsRef.current) {
-      if (map.getLayer(id + '-fill')) map.removeLayer(id + '-fill');
-      if (map.getLayer(id + '-outline')) map.removeLayer(id + '-outline');
-      if (map.getSource(id)) map.removeSource(id);
-    }
+    removeNoGoZoneLayers(map, noGoLayerIdsRef.current);
     noGoLayerIdsRef.current = [];
 
     // Add no-go zone layers
-    for (let i = 0; i < (currentRound.no_go_zones?.length ?? 0); i++) {
-      const zone = currentRound.no_go_zones![i];
-      const srcId = `nogo-zone-${i}`;
-      map.addSource(srcId, {
-        type: 'geojson',
-        data: { type: 'Feature', geometry: zone, properties: {} },
-      });
-      map.addLayer({
-        id: srcId + '-fill',
-        type: 'fill',
-        source: srcId,
-        paint: { 'fill-color': '#EF4444', 'fill-opacity': 0.25 },
-      });
-      map.addLayer({
-        id: srcId + '-outline',
-        type: 'line',
-        source: srcId,
-        paint: { 'line-color': '#EF4444', 'line-width': 2, 'line-dasharray': [3, 2] },
-      });
-      noGoLayerIdsRef.current.push(srcId);
+    if (currentRound.no_go_zones?.length) {
+      noGoLayerIdsRef.current = addNoGoZoneLayers(map, currentRound.no_go_zones, 'nogo-zone');
     }
 
-    // Add start marker
-    if (currentRound.start_point?.coordinates) {
-      const startMarker = new maplibregl.Marker({ color: '#10B981' })
-        .setLngLat(currentRound.start_point.coordinates as [number, number])
-        .setPopup(new maplibregl.Popup().setText('Start'))
-        .addTo(map);
-      markersRef.current.push(startMarker);
-    }
-
-    // Add end marker
-    if (currentRound.end_point?.coordinates) {
-      const endMarker = new maplibregl.Marker({ color: '#EF4444' })
-        .setLngLat(currentRound.end_point.coordinates as [number, number])
-        .setPopup(new maplibregl.Popup().setText('End'))
-        .addTo(map);
-      markersRef.current.push(endMarker);
-    }
+    // Add start/end markers
+    markersRef.current.push(...addRoundMarkers(map, currentRound));
 
     // Fit map to start and end points
     if (currentRound.start_point?.coordinates && currentRound.end_point?.coordinates) {

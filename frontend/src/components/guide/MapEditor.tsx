@@ -9,6 +9,7 @@ import {
 } from 'terra-draw';
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import type { GameMap, Round } from '../../types/game';
+import { addNoGoZoneLayers } from '../../utils/mapUtils';
 
 type FeatureId = string | number;
 import * as api from '../../services/api';
@@ -121,26 +122,9 @@ export default function MapEditor() {
         });
       }
 
-      // No-go zones: red fill
-      for (let zi = 0; zi < (round.no_go_zones?.length ?? 0); zi++) {
-        const zone = round.no_go_zones![zi];
-        const zoneId = `${srcId}-nogo-${zi}`;
-        map.addSource(zoneId, {
-          type: 'geojson',
-          data: { type: 'Feature', geometry: zone, properties: {} },
-        });
-        map.addLayer({
-          id: `${zoneId}-fill`,
-          type: 'fill',
-          source: zoneId,
-          paint: { 'fill-color': '#EF4444', 'fill-opacity': 0.25 },
-        });
-        map.addLayer({
-          id: `${zoneId}-outline`,
-          type: 'line',
-          source: zoneId,
-          paint: { 'line-color': '#EF4444', 'line-width': 2, 'line-dasharray': [3, 2] },
-        });
+      // No-go zones: red fill + dashed outline
+      if (round.no_go_zones?.length) {
+        addNoGoZoneLayers(map, round.no_go_zones, `${srcId}-nogo`);
       }
 
       if (round.start_point?.coordinates) {

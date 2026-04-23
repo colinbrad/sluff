@@ -5,9 +5,7 @@ import * as api from '../../services/api';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useGameStore } from '../../stores/gameStore';
 import { GameWebSocket } from '../../services/ws';
-
-const TEAM_COLORS = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B'];
-const TEAM_NAMES = ['Blue Team', 'Red Team', 'Green Team', 'Gold Team'];
+import { TEAM_COLORS, TEAM_NAMES } from '../../constants';
 
 export default function WaitingRoom() {
   const { sessionId } = useParams<{ sessionId: string }>();

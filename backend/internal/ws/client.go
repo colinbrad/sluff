@@ -133,7 +133,10 @@ func (c *Client) handleMessage(msg model.WSMessage) {
 	}
 }
 
-func mustMarshal(v interface{}) json.RawMessage {
-	b, _ := json.Marshal(v)
+func mustMarshal(v any) json.RawMessage {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
 	return b
 }
