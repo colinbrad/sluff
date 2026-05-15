@@ -81,6 +81,7 @@ export const createRound = (mapId: string, data: {
   start_point: GeoJSON.Geometry;
   end_point: GeoJSON.Geometry;
   corridor: GeoJSON.Geometry;
+  no_go_zones?: GeoJSON.Polygon[];
 }) =>
   authRequest<Round>(`/guide/maps/${mapId}/rounds`, {
     method: 'POST',

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { GameMap } from '../../types/game';
 import * as api from '../../services/api';
 import { useGuideStore } from '../../stores/guideStore';
-import { parseFile, extractRounds } from '../../utils/importGeo';
+import { parseFile } from '../../utils/importGeo';
 
 export default function GuideDashboard() {
   const [maps, setMaps] = useState<GameMap[]>([]);
@@ -44,30 +44,20 @@ export default function GuideDashboard() {
 
     try {
       const fc = await parseFile(file);
-      const rounds = extractRounds(fc);
+      const usable = fc.features.filter((f) => {
+        const t = f.geometry?.type;
+        return t === 'Point' || t === 'Polygon' || t === 'LineString'
+          || t === 'MultiPoint' || t === 'MultiPolygon' || t === 'MultiLineString';
+      });
 
-      if (rounds.length === 0) {
-        setImportError('No usable routes found in file. Import supports LineString, MultiLineString, and Polygon geometries.');
+      if (usable.length === 0) {
+        setImportError('No usable features found in file.');
         setImporting(false);
         return;
       }
 
       const mapName = file.name.replace(/\.(kml|gpx|geojson|json)$/i, '');
-      const m = await api.createMap(mapName, `Imported from ${file.name}`);
-
-      for (let i = 0; i < rounds.length; i++) {
-        const r = rounds[i];
-        await api.createRound(m.id, {
-          round_number: i + 1,
-          name: r.name,
-          start_point: r.start_point,
-          end_point: r.end_point,
-          corridor: r.corridor,
-        });
-      }
-
-      setMaps([m, ...maps]);
-      navigate(`/guide/maps/${m.id}`);
+      navigate('/guide/import', { state: { features: usable, mapName } });
     } catch (err) {
       setImportError(err instanceof Error ? err.message : 'Failed to import file');
     } finally {

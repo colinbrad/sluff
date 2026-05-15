@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"golang.org/x/time/rate"
 
 	"github.com/colinbradley/sluff/internal/config"
 	"github.com/colinbradley/sluff/internal/handler"
@@ -16,18 +17,20 @@ import (
 )
 
 type Server struct {
-	router *chi.Mux
-	store  store.Store
-	hub    *ws.Hub
-	cfg    *config.Config
+	router      *chi.Mux
+	store       store.Store
+	hub         *ws.Hub
+	cfg         *config.Config
+	authLimiter *middleware.RateLimiter
 }
 
 func New(s store.Store, cfg *config.Config) *Server {
 	srv := &Server{
-		router: chi.NewRouter(),
-		store:  s,
-		hub:    ws.NewHub(),
-		cfg:    cfg,
+		router:      chi.NewRouter(),
+		store:       s,
+		hub:         ws.NewHub(),
+		cfg:         cfg,
+		authLimiter: middleware.NewRateLimiter(rate.Limit(5), 10), // 5 req/sec, burst 10
 	}
 
 	go srv.hub.Run()
@@ -65,9 +68,13 @@ func (s *Server) setupRoutes() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// Auth endpoints (public)
-	s.router.Post("/api/auth/register", authH.Register)
-	s.router.Post("/api/auth/login", authH.Login)
+	// Auth endpoints (public, rate limited)
+	s.router.Post("/api/auth/register", func(w http.ResponseWriter, r *http.Request) {
+		s.authLimiter.Limit(http.HandlerFunc(authH.Register)).ServeHTTP(w, r)
+	})
+	s.router.Post("/api/auth/login", func(w http.ResponseWriter, r *http.Request) {
+		s.authLimiter.Limit(http.HandlerFunc(authH.Login)).ServeHTTP(w, r)
+	})
 
 	// Guide map management (requires auth)
 	s.router.Route("/api/guide/maps", func(r chi.Router) {

@@ -6,13 +6,12 @@ require (
 	github.com/coder/websocket v1.8.14
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-chi/cors v1.2.2
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-sqlite3 v1.14.33
 	github.com/paulmach/orb v0.12.0
+	golang.org/x/crypto v0.50.0
+	golang.org/x/time v0.8.0
 )
 
-require (
-	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
-	go.mongodb.org/mongo-driver v1.11.4 // indirect
-	golang.org/x/crypto v0.50.0 // indirect
-)
+require go.mongodb.org/mongo-driver v1.11.4 // indirect
