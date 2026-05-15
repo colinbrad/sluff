@@ -22,6 +22,8 @@ services:
         sync: false
       - key: LITESTREAM_SECRET_ACCESS_KEY
         sync: false
+      - key: JWT_SECRET
+        sync: false
 
   - type: web
     name: sluff-frontend

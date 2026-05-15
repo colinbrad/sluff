@@ -13,7 +13,7 @@ backend/data/*.db-wal
 backend/data/*.db-shm
 
 # Environment
-.env
+*.env
 .env.local
 
 # IDE
