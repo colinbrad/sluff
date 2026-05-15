@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"strings"
 )
@@ -33,7 +34,7 @@ func Load() *Config {
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		jwtSecret = "sluff-dev-secret-change-in-production"
+		log.Fatal("JWT_SECRET environment variable is required")
 	}
 
 	return &Config{

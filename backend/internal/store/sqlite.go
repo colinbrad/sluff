@@ -80,7 +80,7 @@ func seedDefaultGuide(db *sql.DB) error {
 	db.Exec("UPDATE game_maps SET guide_id = ? WHERE guide_id IS NULL", id)
 	db.Exec("UPDATE sessions SET guide_id = ? WHERE guide_id IS NULL", id)
 
-	log.Printf("Created default guide: username=%q password=%q", username, password)
+	log.Printf("Created default guide: username=%q", username)
 	return nil
 }
 
