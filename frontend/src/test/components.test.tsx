@@ -30,10 +30,8 @@ describe('Home page', () => {
     );
 
     expect(screen.getByText('Sluff')).toBeInTheDocument();
-    expect(screen.getByText('Solo Play')).toBeInTheDocument();
     expect(screen.getByText('Join Game')).toBeInTheDocument();
-    expect(screen.getByText('Create Session')).toBeInTheDocument();
-    expect(screen.getByText('Guide Panel')).toBeInTheDocument();
+    expect(screen.getByText('Guide Sign In')).toBeInTheDocument();
   });
 
   it('renders all buttons as clickable', () => {
@@ -44,7 +42,7 @@ describe('Home page', () => {
     );
 
     const buttons = screen.getAllByRole('button');
-    expect(buttons).toHaveLength(4);
+    expect(buttons).toHaveLength(2);
     buttons.forEach((btn) => {
       expect(btn).toBeEnabled();
     });

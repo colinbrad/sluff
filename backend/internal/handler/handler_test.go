@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/colinbradley/sluff/internal/handler"
+	"github.com/colinbradley/sluff/internal/middleware"
 	"github.com/colinbradley/sluff/internal/store"
 	"github.com/colinbradley/sluff/internal/ws"
 )
@@ -45,10 +46,23 @@ func newTestEnv(t *testing.T) *testEnv {
 	sessH := handler.NewSessionHandler(s)
 	gameH := handler.NewGameHandler(s, hub)
 
+	// Look up the seeded admin guide to inject into authenticated routes.
+	adminGuide, err := s.GetGuideByUsername("admin")
+	if err != nil || adminGuide == nil {
+		t.Fatalf("failed to get seeded admin guide: %v", err)
+	}
+	injectGuide := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := middleware.WithGuideID(r.Context(), adminGuide.ID)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+
 	r := chi.NewRouter()
 
-	// Guide routes
+	// Guide routes (require guide ID in context in production)
 	r.Route("/api/guide/maps", func(r chi.Router) {
+		r.Use(injectGuide)
 		r.Post("/", guideH.CreateMap)
 		r.Get("/", guideH.ListMaps)
 		r.Get("/{mapID}", guideH.GetMap)
@@ -61,8 +75,8 @@ func newTestEnv(t *testing.T) *testEnv {
 
 	// Session routes
 	r.Route("/api/sessions", func(r chi.Router) {
-		r.Post("/", sessH.CreateSession)
-		r.Post("/solo", sessH.CreateSoloSession)
+		r.With(injectGuide).Post("/", sessH.CreateSession)
+		r.With(injectGuide).Post("/solo", sessH.CreateSoloSession)
 		r.Get("/{sessionID}", sessH.GetSession)
 		r.Get("/code/{code}", sessH.GetSessionByCode)
 		r.Post("/{sessionID}/join", sessH.JoinSession)

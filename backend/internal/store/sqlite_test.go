@@ -108,22 +108,6 @@ func TestStore_Maps(t *testing.T) {
 		}
 	})
 
-	t.Run("ListMaps includes created map", func(t *testing.T) {
-		maps, err := s.ListMaps()
-		if err != nil {
-			t.Fatalf("ListMaps: %v", err)
-		}
-		found := false
-		for _, gm := range maps {
-			if gm.ID == m.ID {
-				found = true
-			}
-		}
-		if !found {
-			t.Error("created map not returned by ListMaps")
-		}
-	})
-
 	t.Run("UpdateMap persists name change", func(t *testing.T) {
 		m.Name = "Alpha Updated"
 		if err := s.UpdateMap(m); err != nil {

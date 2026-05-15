@@ -55,3 +55,8 @@ func GuideIDFromContext(ctx context.Context) string {
 	id, _ := ctx.Value(guideIDKey).(string)
 	return id
 }
+
+// WithGuideID injects a guide ID into the context without JWT validation.
+func WithGuideID(ctx context.Context, guideID string) context.Context {
+	return context.WithValue(ctx, guideIDKey, guideID)
+}

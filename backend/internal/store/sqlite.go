@@ -121,9 +121,13 @@ func (s *SQLiteStore) GetGuideByID(id string) (*model.Guide, error) {
 // --- Maps ---
 
 func (s *SQLiteStore) CreateMap(m *model.GameMap) error {
+	var guideID interface{}
+	if m.GuideID != "" {
+		guideID = m.GuideID
+	}
 	_, err := s.db.Exec(
 		"INSERT INTO game_maps (id, name, description, guide_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-		m.ID, m.Name, m.Description, m.GuideID, m.CreatedAt, m.UpdatedAt,
+		m.ID, m.Name, m.Description, guideID, m.CreatedAt, m.UpdatedAt,
 	)
 	return err
 }
@@ -285,9 +289,13 @@ func (s *SQLiteStore) DeleteRound(id string) error {
 // --- Sessions ---
 
 func (s *SQLiteStore) CreateSession(sess *model.Session) error {
+	var guideID interface{}
+	if sess.GuideID != "" {
+		guideID = sess.GuideID
+	}
 	_, err := s.db.Exec(
 		"INSERT INTO sessions (id, map_id, guide_id, code, phase, current_round, time_limit_sec, is_solo, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		sess.ID, sess.MapID, sess.GuideID, sess.Code, sess.Phase, sess.CurrentRound, sess.TimeLimitSec, sess.IsSolo, sess.CreatedAt,
+		sess.ID, sess.MapID, guideID, sess.Code, sess.Phase, sess.CurrentRound, sess.TimeLimitSec, sess.IsSolo, sess.CreatedAt,
 	)
 	return err
 }
