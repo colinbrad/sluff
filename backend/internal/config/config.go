@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"log"
 	"os"
 	"strings"
@@ -34,7 +36,10 @@ func Load() *Config {
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		log.Fatal("JWT_SECRET environment variable is required")
+		b := make([]byte, 32)
+		rand.Read(b)
+		jwtSecret = base64.StdEncoding.EncodeToString(b)
+		log.Println("WARNING: JWT_SECRET not set — using ephemeral secret (sessions won't survive restart)")
 	}
 
 	return &Config{

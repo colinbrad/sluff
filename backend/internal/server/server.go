@@ -95,6 +95,9 @@ func (s *Server) setupRoutes() {
 		r.With(guideAuth).Post("/", sessionH.CreateSession)
 		r.With(guideAuth).Post("/solo", sessionH.CreateSoloSession)
 
+		// Public: demo session (no auth required)
+		r.Post("/demo", sessionH.CreateDemoSession)
+
 		// Public: join/observe
 		r.Get("/{sessionID}", sessionH.GetSession)
 		r.Get("/code/{code}", sessionH.GetSessionByCode)
@@ -107,6 +110,10 @@ func (s *Server) setupRoutes() {
 		r.With(guideAuth).Post("/{sessionID}/start", gameH.StartGame)
 		r.With(guideAuth).Delete("/{sessionID}/players/{playerID}", adminH.KickPlayer)
 		r.With(guideAuth).Delete("/{sessionID}/rounds/{roundID}/routes/{teamID}", adminH.ClearRoute)
+
+		// Public: demo round advancement and current round fetch
+		r.Post("/{sessionID}/demo/next", gameH.DemoNextRound)
+		r.Get("/{sessionID}/current-round", gameH.GetCurrentRound)
 
 		// Scoring (public — players submit their own routes)
 		r.Post("/{sessionID}/rounds/{roundID}/submit", gameH.SubmitRoute)

@@ -13,6 +13,7 @@ type Store interface {
 	CreateMap(m *model.GameMap) error
 	GetMap(id string) (*model.GameMap, error)
 	ListMapsByGuide(guideID string) ([]model.GameMap, error)
+	ListAllMaps() ([]model.GameMap, error)
 	UpdateMap(m *model.GameMap) error
 	DeleteMap(id string) error
 

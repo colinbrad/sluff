@@ -42,7 +42,7 @@ describe('Home page', () => {
     );
 
     const buttons = screen.getAllByRole('button');
-    expect(buttons).toHaveLength(2);
+    expect(buttons).toHaveLength(3);
     buttons.forEach((btn) => {
       expect(btn).toBeEnabled();
     });

@@ -15,6 +15,12 @@ export default function Home() {
 
         <div className="flex flex-col gap-3 sm:gap-4">
           <button
+            onClick={() => navigate('/demo')}
+            className="px-6 py-3 sm:px-8 sm:py-4 bg-green-600 text-white rounded-xl text-base sm:text-lg font-semibold hover:bg-green-700 shadow-lg transition-colors"
+          >
+            Try Demo
+          </button>
+          <button
             onClick={() => navigate('/join')}
             className="px-6 py-3 sm:px-8 sm:py-4 bg-blue-600 text-white rounded-xl text-base sm:text-lg font-semibold hover:bg-blue-700 shadow-lg transition-colors"
           >

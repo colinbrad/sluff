@@ -189,6 +189,39 @@ func (s *SQLiteStore) ListMapsByGuide(guideID string) ([]model.GameMap, error) {
 	return maps, nil
 }
 
+func (s *SQLiteStore) ListAllMaps() ([]model.GameMap, error) {
+	rows, err := s.db.Query(
+		"SELECT id, name, description, guide_id, created_at, updated_at FROM game_maps ORDER BY created_at ASC",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var maps []model.GameMap
+	for rows.Next() {
+		var m model.GameMap
+		var gid sql.NullString
+		if err := rows.Scan(&m.ID, &m.Name, &m.Description, &gid, &m.CreatedAt, &m.UpdatedAt); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if gid.Valid {
+			m.GuideID = gid.String
+		}
+		maps = append(maps, m)
+	}
+	rows.Close()
+
+	for i := range maps {
+		rounds, err := s.GetRoundsByMap(maps[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		maps[i].Rounds = rounds
+	}
+	return maps, nil
+}
+
 func (s *SQLiteStore) UpdateMap(m *model.GameMap) error {
 	m.UpdatedAt = time.Now()
 	_, err := s.db.Exec(

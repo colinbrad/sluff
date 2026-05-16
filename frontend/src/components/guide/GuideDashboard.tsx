@@ -16,10 +16,7 @@ export default function GuideDashboard() {
   const { guide, clearAuth } = useGuideStore();
 
   useEffect(() => {
-    api.listMaps().then((m) => {
-      setMaps(m);
-      setLoading(false);
-    });
+    api.listMaps().then(setMaps).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   const handleCreate = async () => {

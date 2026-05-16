@@ -16,6 +16,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (!res.ok) {
+    if (res.status === 401) {
+      useGuideStore.getState().clearAuth();
+    }
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error || res.statusText);
   }
@@ -24,7 +27,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
-// Authenticated request — includes Bearer token header
 function authRequest<T>(path: string, options?: RequestInit): Promise<T> {
   return request<T>(path, {
     ...options,
@@ -36,7 +38,6 @@ function authRequest<T>(path: string, options?: RequestInit): Promise<T> {
   });
 }
 
-// Auth
 export interface AuthResponse {
   token: string;
   guide: Guide;
@@ -54,7 +55,6 @@ export const loginGuide = (username: string, password: string) =>
     body: JSON.stringify({ username, password }),
   });
 
-// Guide - Maps (auth required)
 export const createMap = (name: string, description: string) =>
   authRequest<GameMap>('/guide/maps', {
     method: 'POST',
@@ -74,7 +74,6 @@ export const updateMap = (id: string, data: { name?: string; description?: strin
 export const deleteMap = (id: string) =>
   authRequest<void>(`/guide/maps/${id}`, { method: 'DELETE' });
 
-// Guide - Rounds (auth required)
 export const createRound = (mapId: string, data: {
   round_number: number;
   name: string;
@@ -103,7 +102,6 @@ export const updateRound = (mapId: string, roundId: string, data: Partial<{
 export const deleteRound = (mapId: string, roundId: string) =>
   authRequest<void>(`/guide/maps/${mapId}/rounds/${roundId}`, { method: 'DELETE' });
 
-// Sessions (create requires auth)
 export const createSession = (mapId: string, timeLimitSec?: number) =>
   authRequest<Session>('/sessions', {
     method: 'POST',
@@ -145,7 +143,6 @@ export const submitRoute = (sessionId: string, roundId: string, teamId: string, 
 export const getScores = (sessionId: string, roundId: string) =>
   request<TeamRoute[]>(`/sessions/${sessionId}/rounds/${roundId}/scores`);
 
-// Solo mode (auth required)
 export interface SoloSessionResponse {
   session: Session;
   player: Player;
@@ -157,6 +154,23 @@ export const createSoloSession = (mapId: string, playerName: string, timeLimitSe
     method: 'POST',
     body: JSON.stringify({ map_id: mapId, player_name: playerName, time_limit_sec: timeLimitSec }),
   });
+
+export interface DemoNextRoundResponse {
+  session: Session;
+  round: Round | null;
+}
+
+export const createDemoSession = (playerName: string) =>
+  request<SoloSessionResponse>('/sessions/demo', {
+    method: 'POST',
+    body: JSON.stringify({ player_name: playerName }),
+  });
+
+export const demoNextRound = (sessionId: string) =>
+  request<DemoNextRoundResponse>(`/sessions/${sessionId}/demo/next`, { method: 'POST' });
+
+export const getCurrentRound = (sessionId: string) =>
+  request<Round>(`/sessions/${sessionId}/current-round`);
 
 // Guide admin actions
 export const kickPlayer = (sessionId: string, playerId: string) =>

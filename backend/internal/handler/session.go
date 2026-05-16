@@ -291,6 +291,76 @@ func (h *SessionHandler) CreateSoloSession(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+func (h *SessionHandler) CreateDemoSession(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		PlayerName string `json:"player_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.PlayerName == "" {
+		writeError(w, http.StatusBadRequest, "player_name is required")
+		return
+	}
+
+	maps, err := h.store.ListAllMaps()
+	if err != nil || len(maps) == 0 {
+		writeError(w, http.StatusServiceUnavailable, "no maps available for demo")
+		return
+	}
+	m := maps[0]
+	if len(m.Rounds) == 0 {
+		writeError(w, http.StatusServiceUnavailable, "demo map has no rounds configured")
+		return
+	}
+
+	// GuideID="" marks this as a demo session (no guide owner)
+	sess := &model.Session{
+		ID:           uuid.New().String(),
+		MapID:        m.ID,
+		GuideID:      "",
+		Code:         generateCode(6),
+		Phase:        model.PhasePlaying,
+		CurrentRound: 1,
+		TimeLimitSec: 300,
+		IsSolo:       true,
+		CreatedAt:    time.Now(),
+	}
+	if err := h.store.CreateSession(sess); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create session")
+		return
+	}
+
+	team := &model.Team{
+		ID:        uuid.New().String(),
+		SessionID: sess.ID,
+		Name:      "You",
+		Color:     "#3B82F6",
+	}
+	if err := h.store.CreateTeam(team); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create team")
+		return
+	}
+
+	player := &model.Player{
+		ID:        uuid.New().String(),
+		SessionID: sess.ID,
+		TeamID:    team.ID,
+		Name:      req.PlayerName,
+	}
+	if err := h.store.CreatePlayer(player); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create player")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"session": sess,
+		"player":  player,
+		"team":    team,
+	})
+}
+
 const codeChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // no I/O/0/1 to avoid confusion
 
 func generateCode(length int) string {

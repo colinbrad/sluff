@@ -163,6 +163,71 @@ func (h *GameHandler) GetScores(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, routes)
 }
 
+func (h *GameHandler) GetCurrentRound(w http.ResponseWriter, r *http.Request) {
+	sessionID := chi.URLParam(r, "sessionID")
+
+	sess, err := h.store.GetSession(sessionID)
+	if err != nil || sess == nil {
+		writeError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	if sess.CurrentRound == 0 {
+		writeError(w, http.StatusBadRequest, "no round in progress")
+		return
+	}
+
+	rounds, err := h.store.GetRoundsByMap(sess.MapID)
+	if err != nil || len(rounds) < sess.CurrentRound {
+		writeError(w, http.StatusNotFound, "round not found")
+		return
+	}
+
+	round := rounds[sess.CurrentRound-1]
+	writeJSON(w, http.StatusOK, roundToGeoJSON(&round))
+}
+
+func (h *GameHandler) DemoNextRound(w http.ResponseWriter, r *http.Request) {
+	sessionID := chi.URLParam(r, "sessionID")
+
+	sess, err := h.store.GetSession(sessionID)
+	if err != nil || sess == nil {
+		writeError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	if !sess.IsSolo || sess.GuideID != "" {
+		writeError(w, http.StatusForbidden, "not a demo session")
+		return
+	}
+
+	rounds, err := h.store.GetRoundsByMap(sess.MapID)
+	if err != nil || len(rounds) == 0 {
+		writeError(w, http.StatusBadRequest, "map has no rounds")
+		return
+	}
+
+	nextRound := sess.CurrentRound + 1
+	if nextRound > len(rounds) {
+		sess.Phase = model.PhaseFinished
+		sess.CurrentRound = len(rounds)
+		h.store.UpdateSession(sess)
+		writeJSON(w, http.StatusOK, map[string]interface{}{"session": sess, "round": nil})
+		return
+	}
+
+	sess.Phase = model.PhasePlaying
+	sess.CurrentRound = nextRound
+	if err := h.store.UpdateSession(sess); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update session")
+		return
+	}
+
+	round := rounds[nextRound-1]
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"session": sess,
+		"round":   roundToGeoJSON(&round),
+	})
+}
+
 func mustMarshal(v any) json.RawMessage {
 	b, err := json.Marshal(v)
 	if err != nil {

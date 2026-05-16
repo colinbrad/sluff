@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import {
   TerraDraw,
@@ -20,10 +20,13 @@ import MapOverlayControls from '../map/MapOverlayControls';
 import GameHeader from './GameHeader';
 import RoundReview from './RoundReview';
 import GuideSessionControls from './GuideSessionControls';
+import DemoTutorial, { type DemoStep } from '../demo/DemoTutorial';
 
 export default function GameView() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isDemo = searchParams.get('demo') === 'true';
   const player = usePlayerStore((s) => s.player);
   const guide = useGuideStore((s) => s.guide);
   const {
@@ -50,6 +53,8 @@ export default function GameView() {
   const [mapReady, setMapReady] = useState(false);
   const [terrain3d, setTerrain3d] = useState(false);
   const [slopeShading, setSlopeShading] = useState(false);
+  const [demoStep, setDemoStep] = useState<DemoStep>('welcome');
+  const [hasRoute, setHasRoute] = useState(false);
 
   // Reset game store when entering a new session
   useEffect(() => {
@@ -68,23 +73,36 @@ export default function GameView() {
   const isSolo = session?.is_solo ?? false;
   const isGuide = !!guide && session?.guide_id === guide.id;
 
-  // Fetch session on mount
+  useEffect(() => {
+    if (isDemo && hasRoute && demoStep === 'drawing') {
+      setDemoStep('ready');
+    }
+  }, [isDemo, hasRoute, demoStep]);
+
   useEffect(() => {
     if (!sessionId) return;
     api.getSession(sessionId).then((s) => {
       setSession(s);
       if (s.phase === 'playing' && s.current_round > 0) {
-        api.getMap(s.map_id).then((m) => {
-          const round = m.rounds?.[s.current_round - 1];
-          if (round) {
+        if (isDemo) {
+          api.getCurrentRound(sessionId).then((round) => {
             setCurrentRound(round);
             setPhase('playing');
             setTimeRemaining(s.time_limit_sec);
-          }
-        });
+          });
+        } else {
+          api.getMap(s.map_id).then((m) => {
+            const round = m.rounds?.[s.current_round - 1];
+            if (round) {
+              setCurrentRound(round);
+              setPhase('playing');
+              setTimeRemaining(s.time_limit_sec);
+            }
+          });
+        }
       }
     });
-  }, [sessionId, setSession, setCurrentRound, setPhase, setTimeRemaining]);
+  }, [sessionId, isDemo, setSession, setCurrentRound, setPhase, setTimeRemaining]);
 
   // WebSocket connection (skip for solo)
   useEffect(() => {
@@ -150,7 +168,6 @@ export default function GameView() {
     };
   }, [sessionId, player, isSolo]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Countdown timer
   useEffect(() => {
     if (phase !== 'playing' || timeRemaining <= 0) return;
 
@@ -179,25 +196,20 @@ export default function GameView() {
     const map = mapRef.current;
     if (!map) return;
 
-    // Remove previous markers
     for (const m of markersRef.current) {
       m.remove();
     }
     markersRef.current = [];
 
-    // Remove previous no-go zone layers/sources
     removeNoGoZoneLayers(map, noGoLayerIdsRef.current);
     noGoLayerIdsRef.current = [];
 
-    // Add no-go zone layers
     if (currentRound.no_go_zones?.length) {
       noGoLayerIdsRef.current = addNoGoZoneLayers(map, currentRound.no_go_zones, 'nogo-zone');
     }
 
-    // Add start/end markers
     markersRef.current.push(...addRoundMarkers(map, currentRound));
 
-    // Fit map to start and end points
     if (currentRound.start_point?.coordinates && currentRound.end_point?.coordinates) {
       const bounds = new maplibregl.LngLatBounds();
       bounds.extend(currentRound.start_point.coordinates as [number, number]);
@@ -261,9 +273,9 @@ export default function GameView() {
       // the user can review/adjust without accidentally starting a second line.
       draw.on('finish', () => {
         draw.setMode('select');
+        if (isDemo) setHasRoute(true);
       });
 
-      // Multiplayer: send cursor position and broadcast drawing updates
       if (!isSolo) {
         map.on('mousemove', (e) => {
           wsRef.current?.send('cursor_move', {
@@ -285,7 +297,7 @@ export default function GameView() {
         });
       }
     },
-    [player, isSolo]
+    [player, isSolo, isDemo]
   );
 
   const handleSubmit = async () => {
@@ -310,7 +322,6 @@ export default function GameView() {
       );
       setSubmitted(true);
 
-      // Solo: immediately fetch and show scores
       if (isSolo) {
         const scores = await api.getScores(sessionId, currentRound.id);
         setRouteResults(scores);
@@ -322,7 +333,6 @@ export default function GameView() {
         setShowScores(true);
       }
     } catch {
-      // Submit errors are non-fatal; player can retry
     } finally {
       setSubmitting(false);
     }
@@ -337,29 +347,41 @@ export default function GameView() {
   const handleScoreContinue = async () => {
     if (isSolo && sessionId) {
       try {
-        const updated = await api.startGame(sessionId);
-        setSession(updated);
-        if (updated.phase === 'finished') {
+        let updatedSession;
+        let nextRound;
+
+        if (isDemo) {
+          const { session: s, round: r } = await api.demoNextRound(sessionId);
+          updatedSession = s;
+          nextRound = r;
+        } else {
+          updatedSession = await api.startGame(sessionId);
+          if (updatedSession.phase !== 'finished') {
+            const m = await api.getMap(updatedSession.map_id);
+            nextRound = m.rounds?.[updatedSession.current_round - 1] ?? null;
+          }
+        }
+
+        setSession(updatedSession);
+        if (updatedSession.phase === 'finished') {
           setPhase('finished');
           setShowScores(false);
           return;
         }
-        const m = await api.getMap(updated.map_id);
-        const round = m.rounds?.[updated.current_round - 1];
-        if (round) {
-          setCurrentRound(round);
+        if (nextRound) {
+          setCurrentRound(nextRound);
           setPhase('playing');
-          setTimeRemaining(updated.time_limit_sec);
+          setTimeRemaining(updatedSession.time_limit_sec);
           setShowScores(false);
           setSubmitted(false);
           setRouteResults([]);
-          // Clear previous drawing
+          setHasRoute(false);
+          setDemoStep('drawing');
           const draw = drawRef.current;
           if (draw) {
             draw.clear();
             draw.setMode('linestring');
           }
-          // Markers/corridor will be shown by the useEffect on currentRound
         }
       } catch {
         // Round advance errors are non-fatal
@@ -401,6 +423,9 @@ export default function GameView() {
 
   return (
     <div className="h-screen flex flex-col">
+      {isDemo && demoStep === 'welcome' && (
+        <DemoTutorial step="welcome" onDismissWelcome={() => setDemoStep('drawing')} />
+      )}
       <GameHeader
         roundNumber={currentRound?.round_number || 0}
         roundName={currentRound?.name || ''}
@@ -418,6 +443,9 @@ export default function GameView() {
 
       <div className="flex-1 relative">
         <GameMapComponent onMapReady={initDraw} terrain3d={terrain3d} slopeShading={slopeShading} />
+        {isDemo && demoStep !== 'welcome' && (
+          <DemoTutorial step={demoStep} onDismissWelcome={() => setDemoStep('drawing')} />
+        )}
         {!currentRound && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
             <div className="text-gray-400">Loading round...</div>
