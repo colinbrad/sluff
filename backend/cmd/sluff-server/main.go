@@ -25,5 +25,5 @@ func main() {
 	defer db.Close()
 
 	srv := server.New(db, cfg)
-	log.Fatal(srv.Start(":" + cfg.Port))
+	log.Fatal(srv.Start(cfg.Host + ":" + cfg.Port))
 }
