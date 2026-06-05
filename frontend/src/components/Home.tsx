@@ -9,9 +9,7 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
       <div className="text-center max-w-lg w-full">
         <h1 className="text-4xl sm:text-6xl font-bold text-gray-900 mb-2">Sluff</h1>
-        <p className="text-lg sm:text-xl text-gray-600 mb-8">
-          Draw a safe backcountry ski tour
-        </p>
+        <p className="text-lg sm:text-xl text-gray-600 mb-8">Draw a safe backcountry ski tour</p>
 
         <div className="flex flex-col gap-3 sm:gap-4">
           <button

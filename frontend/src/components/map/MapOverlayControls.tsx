@@ -22,7 +22,12 @@ export default function MapOverlayControls({
         }`}
         title="Toggle 3D terrain"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className="w-5 h-5"
+        >
           <path d="M2 16l5-7 3 4 4-6 4 9H2z" />
         </svg>
         3D
@@ -36,7 +41,12 @@ export default function MapOverlayControls({
         }`}
         title="Toggle slope angle shading"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className="w-5 h-5"
+        >
           <path d="M3 17l14-14v6l-6 8H3z" />
         </svg>
         Slope

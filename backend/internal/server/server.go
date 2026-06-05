@@ -1,8 +1,12 @@
+// Package server wires the chi router, middleware, and HTTP handlers and
+// exposes a Server type that owns the http.Server lifecycle.
 package server
 
 import (
-	"log"
+	"context"
+	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -16,6 +20,7 @@ import (
 	"github.com/colinbradley/sluff/internal/ws"
 )
 
+// Server is the HTTP application: chi router, middleware stack, hub, and store.
 type Server struct {
 	router      *chi.Mux
 	store       store.Store
@@ -24,13 +29,16 @@ type Server struct {
 	authLimiter *middleware.RateLimiter
 }
 
-func New(s store.Store, cfg *config.Config) *Server {
+// New constructs a Server, starts the WebSocket hub, and registers all routes.
+// The rate limiter's cleanup goroutine is tied to ctx so it stops when the
+// caller cancels.
+func New(ctx context.Context, s store.Store, cfg *config.Config) *Server {
 	srv := &Server{
 		router:      chi.NewRouter(),
 		store:       s,
 		hub:         ws.NewHub(),
 		cfg:         cfg,
-		authLimiter: middleware.NewRateLimiter(rate.Limit(5), 10), // 5 req/sec, burst 10
+		authLimiter: middleware.NewRateLimiter(ctx, rate.Limit(5), 10), // 5 req/sec, burst 10
 	}
 
 	go srv.hub.Run()
@@ -48,9 +56,17 @@ func (s *Server) setupMiddleware() {
 		AllowedOrigins:   s.cfg.CORSOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
-		AllowCredentials: true,
+		AllowCredentials: false,
 		MaxAge:           300,
 	}))
+	s.router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// 8 MB accommodates large multi-round GeoJSON/KML imports with
+			// many corridor + no-go-zone vertices.
+			r.Body = http.MaxBytesReader(w, r.Body, 8<<20)
+			next.ServeHTTP(w, r)
+		})
+	})
 }
 
 func (s *Server) setupRoutes() {
@@ -65,7 +81,7 @@ func (s *Server) setupRoutes() {
 
 	s.router.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok"}`))
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
 	// Auth endpoints (public, rate limited)
@@ -121,7 +137,21 @@ func (s *Server) setupRoutes() {
 	})
 }
 
+// Start runs the HTTP server with sane timeouts. It blocks until the server
+// stops or returns an error.
+//
+// ReadTimeout and WriteTimeout are intentionally omitted: the same router
+// serves long-lived WebSocket upgrades, and a Server-wide write deadline
+// persists on the hijacked TCP connection and would close WebSockets after
+// the timeout regardless of activity. ReadHeaderTimeout still guards against
+// slowloris on the header read, and IdleTimeout reaps idle keep-alives.
 func (s *Server) Start(addr string) error {
-	log.Printf("Server starting on %s", addr)
-	return http.ListenAndServe(addr, s.router)
+	httpSrv := &http.Server{
+		Addr:              addr,
+		Handler:           s.router,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	slog.Info("server starting", "addr", addr)
+	return httpSrv.ListenAndServe()
 }

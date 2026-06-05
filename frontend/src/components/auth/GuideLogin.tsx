@@ -20,9 +20,10 @@ export default function GuideLogin() {
     setLoading(true);
     setError('');
     try {
-      const res = tab === 'login'
-        ? await api.loginGuide(username.trim(), password)
-        : await api.registerGuide(username.trim(), password);
+      const res =
+        tab === 'login'
+          ? await api.loginGuide(username.trim(), password)
+          : await api.registerGuide(username.trim(), password);
 
       setAuth(res.guide, res.token);
       navigate('/guide');
@@ -37,10 +38,7 @@ export default function GuideLogin() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
       <div className="max-w-sm w-full bg-white rounded-xl shadow p-6">
         <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => navigate('/')}
-            className="text-gray-400 hover:text-gray-600"
-          >
+          <button onClick={() => navigate('/')} className="text-gray-400 hover:text-gray-600">
             &larr;
           </button>
           <h1 className="text-xl font-bold text-gray-900">Guide Access</h1>
@@ -51,11 +49,12 @@ export default function GuideLogin() {
           {(['login', 'register'] as const).map((t) => (
             <button
               key={t}
-              onClick={() => { setTab(t); setError(''); }}
+              onClick={() => {
+                setTab(t);
+                setError('');
+              }}
               className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                tab === t
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               {t === 'login' ? 'Sign In' : 'Register'}
@@ -65,9 +64,7 @@ export default function GuideLogin() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Username
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
             <input
               type="text"
               value={username}
@@ -78,9 +75,7 @@ export default function GuideLogin() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
             <input
               type="password"
               value={password}
@@ -90,9 +85,7 @@ export default function GuideLogin() {
             />
           </div>
 
-          {error && (
-            <p className="text-sm text-red-600">{error}</p>
-          )}
+          {error && <p className="text-sm text-red-600">{error}</p>}
 
           <button
             type="submit"

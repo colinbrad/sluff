@@ -43,104 +43,123 @@ export interface AuthResponse {
   guide: Guide;
 }
 
-export const registerGuide = (username: string, password: string) =>
+export const registerGuide = (username: string, password: string): Promise<AuthResponse> =>
   request<AuthResponse>('/auth/register', {
     method: 'POST',
     body: JSON.stringify({ username, password }),
   });
 
-export const loginGuide = (username: string, password: string) =>
+export const loginGuide = (username: string, password: string): Promise<AuthResponse> =>
   request<AuthResponse>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ username, password }),
   });
 
-export const createMap = (name: string, description: string) =>
+export const createMap = (name: string, description: string): Promise<GameMap> =>
   authRequest<GameMap>('/guide/maps', {
     method: 'POST',
     body: JSON.stringify({ name, description }),
   });
 
-export const listMaps = () => authRequest<GameMap[]>('/guide/maps');
+export const listMaps = (): Promise<GameMap[]> => authRequest<GameMap[]>('/guide/maps');
 
-export const getMap = (id: string) => authRequest<GameMap>(`/guide/maps/${id}`);
+export const getMap = (id: string): Promise<GameMap> => authRequest<GameMap>(`/guide/maps/${id}`);
 
-export const updateMap = (id: string, data: { name?: string; description?: string }) =>
+export const updateMap = (
+  id: string,
+  data: { name?: string; description?: string },
+): Promise<GameMap> =>
   authRequest<GameMap>(`/guide/maps/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
 
-export const deleteMap = (id: string) =>
+export const deleteMap = (id: string): Promise<void> =>
   authRequest<void>(`/guide/maps/${id}`, { method: 'DELETE' });
 
-export const createRound = (mapId: string, data: {
-  round_number: number;
-  name: string;
-  start_point: GeoJSON.Geometry;
-  end_point: GeoJSON.Geometry;
-  corridor: GeoJSON.Geometry;
-  no_go_zones?: GeoJSON.Polygon[];
-}) =>
+export const createRound = (
+  mapId: string,
+  data: {
+    round_number: number;
+    name: string;
+    start_point: GeoJSON.Geometry;
+    end_point: GeoJSON.Geometry;
+    corridor: GeoJSON.Geometry;
+    no_go_zones?: GeoJSON.Polygon[];
+  },
+): Promise<Round> =>
   authRequest<Round>(`/guide/maps/${mapId}/rounds`, {
     method: 'POST',
     body: JSON.stringify(data),
   });
 
-export const updateRound = (mapId: string, roundId: string, data: Partial<{
-  round_number: number;
-  name: string;
-  start_point: GeoJSON.Geometry;
-  end_point: GeoJSON.Geometry;
-  corridor: GeoJSON.Geometry;
-}>) =>
+export const updateRound = (
+  mapId: string,
+  roundId: string,
+  data: Partial<{
+    round_number: number;
+    name: string;
+    start_point: GeoJSON.Geometry;
+    end_point: GeoJSON.Geometry;
+    corridor: GeoJSON.Geometry;
+  }>,
+): Promise<Round> =>
   authRequest<Round>(`/guide/maps/${mapId}/rounds/${roundId}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
 
-export const deleteRound = (mapId: string, roundId: string) =>
+export const deleteRound = (mapId: string, roundId: string): Promise<void> =>
   authRequest<void>(`/guide/maps/${mapId}/rounds/${roundId}`, { method: 'DELETE' });
 
-export const createSession = (mapId: string, timeLimitSec?: number) =>
+export const createSession = (mapId: string, timeLimitSec?: number): Promise<Session> =>
   authRequest<Session>('/sessions', {
     method: 'POST',
     body: JSON.stringify({ map_id: mapId, time_limit_sec: timeLimitSec }),
   });
 
-export const getSession = (id: string) => request<Session>(`/sessions/${id}`);
+export const getSession = (id: string): Promise<Session> => request<Session>(`/sessions/${id}`);
 
-export const getSessionByCode = (code: string) =>
+export const getSessionByCode = (code: string): Promise<Session> =>
   request<Session>(`/sessions/code/${code}`);
 
-export const joinSession = (sessionId: string, name: string) =>
+export const joinSession = (sessionId: string, name: string): Promise<Player> =>
   request<Player>(`/sessions/${sessionId}/join`, {
     method: 'POST',
     body: JSON.stringify({ name }),
   });
 
-export const createTeam = (sessionId: string, name: string, color: string) =>
+export const createTeam = (sessionId: string, name: string, color: string): Promise<Team> =>
   request<Team>(`/sessions/${sessionId}/teams`, {
     method: 'POST',
     body: JSON.stringify({ name, color }),
   });
 
-export const joinTeam = (sessionId: string, teamId: string, playerId: string) =>
+export const joinTeam = (
+  sessionId: string,
+  teamId: string,
+  playerId: string,
+): Promise<{ status: string }> =>
   request<{ status: string }>(`/sessions/${sessionId}/teams/${teamId}/join`, {
     method: 'POST',
     body: JSON.stringify({ player_id: playerId }),
   });
 
-export const startGame = (sessionId: string) =>
+export const startGame = (sessionId: string): Promise<Session> =>
   authRequest<Session>(`/sessions/${sessionId}/start`, { method: 'POST' });
 
-export const submitRoute = (sessionId: string, roundId: string, teamId: string, path: GeoJSON.Geometry) =>
+export const submitRoute = (
+  sessionId: string,
+  roundId: string,
+  teamId: string,
+  path: GeoJSON.Geometry,
+): Promise<TeamRoute> =>
   request<TeamRoute>(`/sessions/${sessionId}/rounds/${roundId}/submit`, {
     method: 'POST',
     body: JSON.stringify({ team_id: teamId, path }),
   });
 
-export const getScores = (sessionId: string, roundId: string) =>
+export const getScores = (sessionId: string, roundId: string): Promise<TeamRoute[]> =>
   request<TeamRoute[]>(`/sessions/${sessionId}/rounds/${roundId}/scores`);
 
 export interface SoloSessionResponse {
@@ -149,7 +168,11 @@ export interface SoloSessionResponse {
   team: Team;
 }
 
-export const createSoloSession = (mapId: string, playerName: string, timeLimitSec?: number) =>
+export const createSoloSession = (
+  mapId: string,
+  playerName: string,
+  timeLimitSec?: number,
+): Promise<SoloSessionResponse> =>
   authRequest<SoloSessionResponse>('/sessions/solo', {
     method: 'POST',
     body: JSON.stringify({ map_id: mapId, player_name: playerName, time_limit_sec: timeLimitSec }),
@@ -160,21 +183,23 @@ export interface DemoNextRoundResponse {
   round: Round | null;
 }
 
-export const createDemoSession = (playerName: string) =>
+export const createDemoSession = (playerName: string): Promise<SoloSessionResponse> =>
   request<SoloSessionResponse>('/sessions/demo', {
     method: 'POST',
     body: JSON.stringify({ player_name: playerName }),
   });
 
-export const demoNextRound = (sessionId: string) =>
+export const demoNextRound = (sessionId: string): Promise<DemoNextRoundResponse> =>
   request<DemoNextRoundResponse>(`/sessions/${sessionId}/demo/next`, { method: 'POST' });
 
-export const getCurrentRound = (sessionId: string) =>
+export const getCurrentRound = (sessionId: string): Promise<Round> =>
   request<Round>(`/sessions/${sessionId}/current-round`);
 
 // Guide admin actions
-export const kickPlayer = (sessionId: string, playerId: string) =>
+export const kickPlayer = (sessionId: string, playerId: string): Promise<void> =>
   authRequest<void>(`/sessions/${sessionId}/players/${playerId}`, { method: 'DELETE' });
 
-export const clearRoute = (sessionId: string, roundId: string, teamId: string) =>
-  authRequest<void>(`/sessions/${sessionId}/rounds/${roundId}/routes/${teamId}`, { method: 'DELETE' });
+export const clearRoute = (sessionId: string, roundId: string, teamId: string): Promise<void> =>
+  authRequest<void>(`/sessions/${sessionId}/rounds/${roundId}/routes/${teamId}`, {
+    method: 'DELETE',
+  });

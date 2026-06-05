@@ -41,7 +41,18 @@ describe('gameStore', () => {
       name: 'Round 1',
       start_point: { type: 'Point', coordinates: [10, 47] },
       end_point: { type: 'Point', coordinates: [10.1, 47.1] },
-      corridor: { type: 'Polygon', coordinates: [[[10, 47], [10.1, 47], [10.1, 47.1], [10, 47.1], [10, 47]]] },
+      corridor: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [10, 47],
+            [10.1, 47],
+            [10.1, 47.1],
+            [10, 47.1],
+            [10, 47],
+          ],
+        ],
+      },
     };
     useGameStore.getState().setCurrentRound(round);
     expect(useGameStore.getState().currentRound).toEqual(round);
@@ -74,14 +85,31 @@ describe('gameStore', () => {
   it('setTeamDrawing stores line', () => {
     const line: GeoJSON.LineString = {
       type: 'LineString',
-      coordinates: [[10, 47], [10.1, 47.1]],
+      coordinates: [
+        [10, 47],
+        [10.1, 47.1],
+      ],
     };
     useGameStore.getState().setTeamDrawing(line);
     expect(useGameStore.getState().teamDrawing).toEqual(line);
   });
 
   it('setTeamScores stores scores', () => {
-    const scores = [{ team_id: 't1', score: { total_points: 800, points_in_corridor: 10, percent_in_corridor: 80, route_length_km: 1.2, max_deviation_m: 50, connects_start: true, connects_end: true, final_score: 800 } }];
+    const scores = [
+      {
+        team_id: 't1',
+        score: {
+          total_points: 800,
+          points_in_corridor: 10,
+          percent_in_corridor: 80,
+          route_length_km: 1.2,
+          max_deviation_m: 50,
+          connects_start: true,
+          connects_end: true,
+          final_score: 800,
+        },
+      },
+    ];
     useGameStore.getState().setTeamScores(scores);
     expect(useGameStore.getState().teamScores).toEqual(scores);
   });
@@ -122,7 +150,9 @@ describe('playerStore', () => {
   });
 
   it('setPlayer to null clears player', () => {
-    usePlayerStore.getState().setPlayer({ id: 'p1', session_id: 's1', team_id: 't1', name: 'Test', is_online: true });
+    usePlayerStore
+      .getState()
+      .setPlayer({ id: 'p1', session_id: 's1', team_id: 't1', name: 'Test', is_online: true });
     usePlayerStore.getState().setPlayer(null);
     expect(usePlayerStore.getState().player).toBeNull();
   });

@@ -200,7 +200,7 @@ func TestStore_Rounds(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if rounds != nil && len(rounds) != 0 {
+		if len(rounds) != 0 {
 			t.Errorf("expected empty, got %d rounds", len(rounds))
 		}
 	})

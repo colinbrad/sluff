@@ -13,6 +13,6 @@ export const usePlayerStore = create<PlayerState>()(
       player: null,
       setPlayer: (player) => set({ player }),
     }),
-    { name: 'sluff-player' }
-  )
+    { name: 'sluff-player' },
+  ),
 );

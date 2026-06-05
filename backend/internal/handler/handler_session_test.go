@@ -20,7 +20,7 @@ func TestMultiplayerSessionAPI(t *testing.T) {
 	}
 	mapID := jsonField(t, rr, "id")
 
-	rr = env.doRequest(t, http.MethodPost, "/api/guide/maps/"+mapID+"/rounds", map[string]interface{}{
+	rr = env.doRequest(t, http.MethodPost, "/api/guide/maps/"+mapID+"/rounds", map[string]any{
 		"round_number": 1,
 		"name":         "Round 1",
 		"start_point":  json.RawMessage(startPointJSON),
@@ -35,14 +35,14 @@ func TestMultiplayerSessionAPI(t *testing.T) {
 	var sessionCode string
 
 	t.Run("CreateSession_201", func(t *testing.T) {
-		rr := env.doRequest(t, http.MethodPost, "/api/sessions/", map[string]interface{}{
+		rr := env.doRequest(t, http.MethodPost, "/api/sessions/", map[string]any{
 			"map_id":         mapID,
 			"time_limit_sec": 300,
 		})
 		if rr.Code != http.StatusCreated {
 			t.Fatalf("expected 201, got %d: %s", rr.Code, rr.Body.String())
 		}
-		var sess map[string]interface{}
+		var sess map[string]any
 		decodeJSON(t, rr, &sess)
 		sessionID = sess["id"].(string)
 		sessionCode = sess["code"].(string)
@@ -58,7 +58,7 @@ func TestMultiplayerSessionAPI(t *testing.T) {
 	})
 
 	t.Run("CreateSession_MissingMapID_400", func(t *testing.T) {
-		rr := env.doRequest(t, http.MethodPost, "/api/sessions/", map[string]interface{}{
+		rr := env.doRequest(t, http.MethodPost, "/api/sessions/", map[string]any{
 			"time_limit_sec": 300,
 		})
 		if rr.Code != http.StatusBadRequest {
@@ -67,7 +67,7 @@ func TestMultiplayerSessionAPI(t *testing.T) {
 	})
 
 	t.Run("CreateSession_UnknownMap_404", func(t *testing.T) {
-		rr := env.doRequest(t, http.MethodPost, "/api/sessions/", map[string]interface{}{
+		rr := env.doRequest(t, http.MethodPost, "/api/sessions/", map[string]any{
 			"map_id": "no-such-map",
 		})
 		if rr.Code != http.StatusNotFound {
@@ -172,7 +172,7 @@ func TestMultiplayerSessionAPI(t *testing.T) {
 		if rr.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 		}
-		var resp map[string]interface{}
+		var resp map[string]any
 		decodeJSON(t, rr, &resp)
 		if resp["status"] != "joined" {
 			t.Errorf("expected status 'joined', got %v", resp["status"])
@@ -191,14 +191,14 @@ func TestMultiplayerSessionAPI(t *testing.T) {
 		if rr.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", rr.Code)
 		}
-		var sess map[string]interface{}
+		var sess map[string]any
 		decodeJSON(t, rr, &sess)
 
-		teams, _ := sess["teams"].([]interface{})
+		teams, _ := sess["teams"].([]any)
 		if len(teams) != 1 {
 			t.Errorf("expected 1 team in session, got %d", len(teams))
 		}
-		players, _ := sess["players"].([]interface{})
+		players, _ := sess["players"].([]any)
 		if len(players) != 1 {
 			t.Errorf("expected 1 player in session, got %d", len(players))
 		}
@@ -214,14 +214,16 @@ func TestMultiplayerSessionAPI(t *testing.T) {
 
 	t.Run("JoinSession_GameAlreadyStarted_400", func(t *testing.T) {
 		// Bootstrap a fresh session that has 2 teams to actually start
-		rr2 := env.doRequest(t, http.MethodPost, "/api/sessions/solo", map[string]interface{}{
+		rr2 := env.doRequest(t, http.MethodPost, "/api/sessions/solo", map[string]any{
 			"map_id": mapID, "player_name": "Alice", "time_limit_sec": 300,
 		})
 		if rr2.Code != http.StatusCreated {
 			t.Fatalf("create solo session: %d %s", rr2.Code, rr2.Body.String())
 		}
 		var soloResp struct {
-			Session struct{ ID string `json:"id"` } `json:"session"`
+			Session struct {
+				ID string `json:"id"`
+			} `json:"session"`
 		}
 		decodeJSON(t, rr2, &soloResp)
 		startedID := soloResp.Session.ID
@@ -248,7 +250,7 @@ func TestGetScores(t *testing.T) {
 	rr := env.doRequest(t, http.MethodPost, "/api/guide/maps/", map[string]string{"name": "Score Map"})
 	mapID := jsonField(t, rr, "id")
 
-	rr = env.doRequest(t, http.MethodPost, "/api/guide/maps/"+mapID+"/rounds", map[string]interface{}{
+	rr = env.doRequest(t, http.MethodPost, "/api/guide/maps/"+mapID+"/rounds", map[string]any{
 		"round_number": 1,
 		"name":         "Round 1",
 		"start_point":  json.RawMessage(startPointJSON),
@@ -257,12 +259,16 @@ func TestGetScores(t *testing.T) {
 	})
 	roundID := jsonField(t, rr, "id")
 
-	rr = env.doRequest(t, http.MethodPost, "/api/sessions/solo", map[string]interface{}{
+	rr = env.doRequest(t, http.MethodPost, "/api/sessions/solo", map[string]any{
 		"map_id": mapID, "player_name": "Scorer", "time_limit_sec": 300,
 	})
 	var soloResp struct {
-		Session struct{ ID string `json:"id"` } `json:"session"`
-		Team    struct{ ID string `json:"id"` } `json:"team"`
+		Session struct {
+			ID string `json:"id"`
+		} `json:"session"`
+		Team struct {
+			ID string `json:"id"`
+		} `json:"team"`
 	}
 	decodeJSON(t, rr, &soloResp)
 	sessionID := soloResp.Session.ID
@@ -275,7 +281,7 @@ func TestGetScores(t *testing.T) {
 		if rr.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 		}
-		var routes []interface{}
+		var routes []any
 		decodeJSON(t, rr, &routes)
 		if len(routes) != 0 {
 			t.Errorf("expected 0 routes before submission, got %d", len(routes))
@@ -284,7 +290,7 @@ func TestGetScores(t *testing.T) {
 
 	t.Run("GetScores_AfterSubmission_ReturnsRoute", func(t *testing.T) {
 		// Submit a route
-		env.doRequest(t, http.MethodPost, "/api/sessions/"+sessionID+"/rounds/"+roundID+"/submit", map[string]interface{}{
+		env.doRequest(t, http.MethodPost, "/api/sessions/"+sessionID+"/rounds/"+roundID+"/submit", map[string]any{
 			"team_id": teamID,
 			"path":    json.RawMessage(routeLineJSON),
 		})
@@ -293,7 +299,7 @@ func TestGetScores(t *testing.T) {
 		if rr.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 		}
-		var routes []map[string]interface{}
+		var routes []map[string]any
 		decodeJSON(t, rr, &routes)
 		if len(routes) != 1 {
 			t.Fatalf("expected 1 route after submission, got %d", len(routes))
@@ -354,7 +360,7 @@ func TestUpdateMapAndRound(t *testing.T) {
 	})
 
 	// Create a round
-	rr = env.doRequest(t, http.MethodPost, "/api/guide/maps/"+mapID+"/rounds", map[string]interface{}{
+	rr = env.doRequest(t, http.MethodPost, "/api/guide/maps/"+mapID+"/rounds", map[string]any{
 		"round_number": 1,
 		"name":         "Old Round Name",
 		"start_point":  json.RawMessage(startPointJSON),
@@ -368,7 +374,7 @@ func TestUpdateMapAndRound(t *testing.T) {
 
 	t.Run("UpdateRound_ChangesName", func(t *testing.T) {
 		nameVal := "Updated Round Name"
-		rr := env.doRequest(t, http.MethodPut, "/api/guide/maps/"+mapID+"/rounds/"+roundID, map[string]interface{}{
+		rr := env.doRequest(t, http.MethodPut, "/api/guide/maps/"+mapID+"/rounds/"+roundID, map[string]any{
 			"name": &nameVal,
 		})
 		if rr.Code != http.StatusOK {
@@ -382,7 +388,7 @@ func TestUpdateMapAndRound(t *testing.T) {
 
 	t.Run("UpdateRound_NotFound_404", func(t *testing.T) {
 		nameVal := "Whatever"
-		rr := env.doRequest(t, http.MethodPut, "/api/guide/maps/"+mapID+"/rounds/no-such-round", map[string]interface{}{
+		rr := env.doRequest(t, http.MethodPut, "/api/guide/maps/"+mapID+"/rounds/no-such-round", map[string]any{
 			"name": &nameVal,
 		})
 		if rr.Code != http.StatusNotFound {
@@ -409,7 +415,7 @@ func TestMultiRoundGameFinishes(t *testing.T) {
 		{1, "Round 1"},
 		{2, "Round 2"},
 	} {
-		rr = env.doRequest(t, http.MethodPost, "/api/guide/maps/"+mapID+"/rounds", map[string]interface{}{
+		rr = env.doRequest(t, http.MethodPost, "/api/guide/maps/"+mapID+"/rounds", map[string]any{
 			"round_number": round.num,
 			"name":         round.name,
 			"start_point":  json.RawMessage(startPointJSON),
@@ -422,7 +428,7 @@ func TestMultiRoundGameFinishes(t *testing.T) {
 	}
 
 	// Create solo session
-	rr = env.doRequest(t, http.MethodPost, "/api/sessions/solo", map[string]interface{}{
+	rr = env.doRequest(t, http.MethodPost, "/api/sessions/solo", map[string]any{
 		"map_id": mapID, "player_name": "Pro Skier", "time_limit_sec": 300,
 	})
 	var soloResp struct {
@@ -484,11 +490,57 @@ func TestMultiRoundGameFinishes(t *testing.T) {
 // SubmitRoute error cases
 // ---------------------------------------------------------------------------
 
+// submitTestSetup creates a map+round+solo session in playing phase and returns
+// the IDs needed for submit-route tests.
+func submitTestSetup(t *testing.T, env *testEnv) (sessionID, roundID, teamID string) {
+	t.Helper()
+	rr := env.doRequest(t, http.MethodPost, "/api/guide/maps/", map[string]string{"name": "Submit Map"})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create map: %d %s", rr.Code, rr.Body.String())
+	}
+	mapID := jsonField(t, rr, "id")
+
+	rr = env.doRequest(t, http.MethodPost, "/api/guide/maps/"+mapID+"/rounds", map[string]any{
+		"round_number": 1, "name": "R1",
+		"start_point": json.RawMessage(startPointJSON),
+		"end_point":   json.RawMessage(endPointJSON),
+		"corridor":    json.RawMessage(corridorJSON),
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create round: %d %s", rr.Code, rr.Body.String())
+	}
+	roundID = jsonField(t, rr, "id")
+
+	rr = env.doRequest(t, http.MethodPost, "/api/sessions/solo", map[string]any{
+		"map_id": mapID, "player_name": "Tester", "time_limit_sec": 300,
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create solo session: %d %s", rr.Code, rr.Body.String())
+	}
+	var soloResp struct {
+		Session struct {
+			ID string `json:"id"`
+		} `json:"session"`
+		Team struct {
+			ID string `json:"id"`
+		} `json:"team"`
+	}
+	decodeJSON(t, rr, &soloResp)
+	sessionID = soloResp.Session.ID
+	teamID = soloResp.Team.ID
+
+	rr = env.doRequest(t, http.MethodPost, "/api/sessions/"+sessionID+"/start", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("start game: %d %s", rr.Code, rr.Body.String())
+	}
+	return sessionID, roundID, teamID
+}
+
 func TestSubmitRoute_Errors(t *testing.T) {
 	env := newTestEnv(t)
 
-	t.Run("UnknownRound_404", func(t *testing.T) {
-		rr := env.doRequest(t, http.MethodPost, "/api/sessions/s1/rounds/no-such-round/submit", map[string]interface{}{
+	t.Run("UnknownSession_404", func(t *testing.T) {
+		rr := env.doRequest(t, http.MethodPost, "/api/sessions/no-such-session/rounds/no-such-round/submit", map[string]any{
 			"team_id": "t1",
 			"path":    json.RawMessage(routeLineJSON),
 		})
@@ -497,21 +549,87 @@ func TestSubmitRoute_Errors(t *testing.T) {
 		}
 	})
 
-	t.Run("InvalidPath_400", func(t *testing.T) {
-		// Create a valid map/round/session to get a real round id
-		rr := env.doRequest(t, http.MethodPost, "/api/guide/maps/", map[string]string{"name": "Err Map"})
+	t.Run("SessionNotPlaying_400", func(t *testing.T) {
+		// Create a session but don't start it (phase=waiting)
+		rr := env.doRequest(t, http.MethodPost, "/api/guide/maps/", map[string]string{"name": "Phase Map"})
 		mapID := jsonField(t, rr, "id")
-		rr = env.doRequest(t, http.MethodPost, "/api/guide/maps/"+mapID+"/rounds", map[string]interface{}{
-			"round_number": 1,
-			"name":         "Err Round",
-			"start_point":  json.RawMessage(startPointJSON),
-			"end_point":    json.RawMessage(endPointJSON),
-			"corridor":     json.RawMessage(corridorJSON),
+		env.doRequest(t, http.MethodPost, "/api/guide/maps/"+mapID+"/rounds", map[string]any{
+			"round_number": 1, "name": "R1",
+			"start_point": json.RawMessage(startPointJSON),
+			"end_point":   json.RawMessage(endPointJSON),
+			"corridor":    json.RawMessage(corridorJSON),
 		})
-		roundID := jsonField(t, rr, "id")
+		rr = env.doRequest(t, http.MethodPost, "/api/sessions/solo", map[string]any{
+			"map_id": mapID, "player_name": "P", "time_limit_sec": 300,
+		})
+		var soloResp struct {
+			Session struct {
+				ID string `json:"id"`
+			} `json:"session"`
+			Team struct {
+				ID string `json:"id"`
+			} `json:"team"`
+		}
+		decodeJSON(t, rr, &soloResp)
 
-		rr = env.doRequest(t, http.MethodPost, "/api/sessions/s1/rounds/"+roundID+"/submit", map[string]interface{}{
-			"team_id": "t1",
+		// Get the round ID
+		rr2 := env.doRequest(t, http.MethodGet, "/api/guide/maps/"+mapID, nil)
+		var m map[string]any
+		decodeJSON(t, rr2, &m)
+		rounds := m["rounds"].([]any)
+		roundID := rounds[0].(map[string]any)["id"].(string)
+
+		rr = env.doRequest(t, http.MethodPost, "/api/sessions/"+soloResp.Session.ID+"/rounds/"+roundID+"/submit", map[string]any{
+			"team_id": soloResp.Team.ID,
+			"path":    json.RawMessage(routeLineJSON),
+		})
+		if rr.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for non-playing session, got %d: %s", rr.Code, rr.Body.String())
+		}
+	})
+
+	t.Run("UnknownRound_404", func(t *testing.T) {
+		sessionID, _, teamID := submitTestSetup(t, env)
+		rr := env.doRequest(t, http.MethodPost, "/api/sessions/"+sessionID+"/rounds/no-such-round/submit", map[string]any{
+			"team_id": teamID,
+			"path":    json.RawMessage(routeLineJSON),
+		})
+		if rr.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d: %s", rr.Code, rr.Body.String())
+		}
+	})
+
+	t.Run("ForeignTeam_403", func(t *testing.T) {
+		sessionID, roundID, _ := submitTestSetup(t, env)
+		rr := env.doRequest(t, http.MethodPost, "/api/sessions/"+sessionID+"/rounds/"+roundID+"/submit", map[string]any{
+			"team_id": "00000000-0000-0000-0000-000000000000",
+			"path":    json.RawMessage(routeLineJSON),
+		})
+		if rr.Code != http.StatusForbidden {
+			t.Fatalf("expected 403 for foreign team, got %d: %s", rr.Code, rr.Body.String())
+		}
+	})
+
+	t.Run("DuplicateSubmission_409", func(t *testing.T) {
+		sessionID, roundID, teamID := submitTestSetup(t, env)
+		body := map[string]any{
+			"team_id": teamID,
+			"path":    json.RawMessage(routeLineJSON),
+		}
+		rr := env.doRequest(t, http.MethodPost, "/api/sessions/"+sessionID+"/rounds/"+roundID+"/submit", body)
+		if rr.Code != http.StatusCreated {
+			t.Fatalf("first submit: expected 201, got %d: %s", rr.Code, rr.Body.String())
+		}
+		rr = env.doRequest(t, http.MethodPost, "/api/sessions/"+sessionID+"/rounds/"+roundID+"/submit", body)
+		if rr.Code != http.StatusConflict {
+			t.Fatalf("second submit: expected 409, got %d: %s", rr.Code, rr.Body.String())
+		}
+	})
+
+	t.Run("InvalidPath_400", func(t *testing.T) {
+		sessionID, roundID, teamID := submitTestSetup(t, env)
+		rr := env.doRequest(t, http.MethodPost, "/api/sessions/"+sessionID+"/rounds/"+roundID+"/submit", map[string]any{
+			"team_id": teamID,
 			"path":    json.RawMessage(`"not a linestring"`),
 		})
 		if rr.Code != http.StatusBadRequest {

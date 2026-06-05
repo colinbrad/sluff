@@ -1,4 +1,4 @@
-.PHONY: dev dev-backend dev-frontend build build-backend build-frontend test clean
+.PHONY: dev dev-backend dev-frontend build build-backend build-frontend test test-backend test-frontend lint lint-backend lint-frontend fmt fmt-backend fmt-frontend clean
 
 # Development: run frontend and backend concurrently
 dev:
@@ -27,6 +27,24 @@ test-backend:
 
 test-frontend:
 	cd frontend && npm test
+
+# Lint
+lint: lint-backend lint-frontend
+
+lint-backend:
+	cd backend && golangci-lint run ./...
+
+lint-frontend:
+	cd frontend && npm run lint
+
+# Format
+fmt: fmt-backend fmt-frontend
+
+fmt-backend:
+	cd backend && gofumpt -w .
+
+fmt-frontend:
+	cd frontend && npm run format
 
 # Clean
 clean:

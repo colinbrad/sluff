@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/paulmach/orb/geojson"
 )
 
+// GameMap is a guide-owned map composed of an ordered list of rounds.
 type GameMap struct {
 	ID          string    `json:"id"`
 	Name        string    `json:"name"`
@@ -19,6 +21,8 @@ type GameMap struct {
 	Rounds      []Round   `json:"rounds,omitempty"`
 }
 
+// Round is a single navigation challenge with a start point, end point,
+// permitted corridor, and optional no-go zones.
 type Round struct {
 	ID          string        `json:"id"`
 	MapID       string        `json:"map_id"`
@@ -35,17 +39,17 @@ type Round struct {
 func ValidateRound(r *Round) error {
 	zeroPoint := orb.Point{0, 0}
 	if r.StartPoint.Equal(zeroPoint) {
-		return fmt.Errorf("start point is required")
+		return errors.New("start point is required")
 	}
 	if r.EndPoint.Equal(zeroPoint) {
-		return fmt.Errorf("end point is required")
+		return errors.New("end point is required")
 	}
 	if r.StartPoint.Equal(r.EndPoint) {
-		return fmt.Errorf("start and end points must be different locations")
+		return errors.New("start and end points must be different locations")
 	}
 	if len(r.Corridor) == 0 || len(r.Corridor[0]) < 4 {
-		// GeoJSON polygons require at least 4 coordinates (3 vertices + closing point)
-		return fmt.Errorf("corridor polygon is required and must have at least 3 vertices")
+		// GeoJSON polygons require at least 4 coordinates (3 vertices + closing point).
+		return errors.New("corridor polygon is required and must have at least 3 vertices")
 	}
 	return nil
 }
@@ -54,18 +58,30 @@ func ValidateRound(r *Round) error {
 func RoundFromJSON(startPointJSON, endPointJSON, corridorJSON string) (orb.Point, orb.Point, orb.Polygon, error) {
 	startGeom, err := geojson.UnmarshalGeometry([]byte(startPointJSON))
 	if err != nil {
-		return orb.Point{}, orb.Point{}, nil, err
+		return orb.Point{}, orb.Point{}, nil, fmt.Errorf("parse start point: %w", err)
 	}
 	endGeom, err := geojson.UnmarshalGeometry([]byte(endPointJSON))
 	if err != nil {
-		return orb.Point{}, orb.Point{}, nil, err
+		return orb.Point{}, orb.Point{}, nil, fmt.Errorf("parse end point: %w", err)
 	}
 	corrGeom, err := geojson.UnmarshalGeometry([]byte(corridorJSON))
 	if err != nil {
-		return orb.Point{}, orb.Point{}, nil, err
+		return orb.Point{}, orb.Point{}, nil, fmt.Errorf("parse corridor: %w", err)
 	}
 
-	return startGeom.Geometry().(orb.Point), endGeom.Geometry().(orb.Point), corrGeom.Geometry().(orb.Polygon), nil
+	start, ok := startGeom.Geometry().(orb.Point)
+	if !ok {
+		return orb.Point{}, orb.Point{}, nil, errors.New("start point: expected Point geometry")
+	}
+	end, ok := endGeom.Geometry().(orb.Point)
+	if !ok {
+		return orb.Point{}, orb.Point{}, nil, errors.New("end point: expected Point geometry")
+	}
+	corr, ok := corrGeom.Geometry().(orb.Polygon)
+	if !ok {
+		return orb.Point{}, orb.Point{}, nil, errors.New("corridor: expected Polygon geometry")
+	}
+	return start, end, corr, nil
 }
 
 // NoGoZonesToJSON encodes a slice of polygons as a JSON array of GeoJSON geometries.
@@ -89,17 +105,17 @@ func NoGoZonesFromJSON(s string) ([]orb.Polygon, error) {
 	}
 	var raws []json.RawMessage
 	if err := json.Unmarshal([]byte(s), &raws); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode no-go zones: %w", err)
 	}
 	zones := make([]orb.Polygon, 0, len(raws))
 	for _, raw := range raws {
 		geom, err := geojson.UnmarshalGeometry(raw)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parse no-go zone geometry: %w", err)
 		}
 		poly, ok := geom.Geometry().(orb.Polygon)
 		if !ok {
-			return nil, fmt.Errorf("expected Polygon geometry in no-go zones")
+			return nil, errors.New("expected Polygon geometry in no-go zones")
 		}
 		zones = append(zones, poly)
 	}

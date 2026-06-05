@@ -30,7 +30,7 @@ export default function GameMap({
       style: {
         version: 8,
         sources: {
-          'opentopomap': {
+          opentopomap: {
             type: 'raster',
             tiles: [
               'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
@@ -112,11 +112,7 @@ export default function GameMap({
     const map = mapRef.current;
     if (!map || !mapLoadedRef.current) return;
 
-    map.setLayoutProperty(
-      'slope-hillshade',
-      'visibility',
-      slopeShading ? 'visible' : 'none',
-    );
+    map.setLayoutProperty('slope-hillshade', 'visibility', slopeShading ? 'visible' : 'none');
   }, [slopeShading]);
 
   return <div ref={containerRef} className={className} />;

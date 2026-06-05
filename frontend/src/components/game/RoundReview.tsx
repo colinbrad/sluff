@@ -3,6 +3,7 @@ import maplibregl from 'maplibre-gl';
 import type { Team, TeamRoute, ScoreDetails, Round } from '../../types/game';
 import { TEAM_COLORS } from '../../constants';
 import { addRoundMarkers, addNoGoZoneLayers } from '../../utils/mapUtils';
+import { toCoord } from '../../utils/geojson';
 import GameMapComponent from '../map/GameMap';
 
 interface RoundReviewProps {
@@ -23,15 +24,13 @@ export default function RoundReview({
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  const sorted = [...teamScores].sort(
-    (a, b) => b.score.final_score - a.score.final_score
-  );
+  const sorted = [...teamScores].sort((a, b) => b.score.final_score - a.score.final_score);
 
   const getTeam = (teamId: string) => teams.find((t) => t.id === teamId);
 
-  const getTeamColor = (teamId: string, index: number) => {
+  const getTeamColor = (teamId: string, index: number): string => {
     const team = getTeam(teamId);
-    return team?.color || TEAM_COLORS[index % TEAM_COLORS.length];
+    return team?.color || TEAM_COLORS[index % TEAM_COLORS.length] || '#3B82F6';
   };
 
   // Add routes, markers, and no-go zones once the map is ready
@@ -49,11 +48,11 @@ export default function RoundReview({
     if (currentRound) {
       const markers = addRoundMarkers(map, currentRound);
       if (currentRound.start_point?.coordinates) {
-        bounds.extend(currentRound.start_point.coordinates as [number, number]);
+        bounds.extend(toCoord(currentRound.start_point.coordinates));
         hasBounds = true;
       }
       if (currentRound.end_point?.coordinates) {
-        bounds.extend(currentRound.end_point.coordinates as [number, number]);
+        bounds.extend(toCoord(currentRound.end_point.coordinates));
         hasBounds = true;
       }
       // Markers don't need cleanup — they're removed with the map on unmount
@@ -91,7 +90,7 @@ export default function RoundReview({
       });
 
       for (const coord of geojson.coordinates) {
-        bounds.extend(coord as [number, number]);
+        bounds.extend(toCoord(coord));
         hasBounds = true;
       }
     });
@@ -136,9 +135,7 @@ export default function RoundReview({
                     className="w-5 sm:w-6 h-1 rounded-full shrink-0"
                     style={{ backgroundColor: color }}
                   />
-                  <span className="text-white text-xs sm:text-sm">
-                    {team?.name || 'Unknown'}
-                  </span>
+                  <span className="text-white text-xs sm:text-sm">{team?.name || 'Unknown'}</span>
                   <span className="text-gray-400 text-xs sm:text-sm">
                     {Math.round(entry.score.final_score)}pts
                   </span>
@@ -155,10 +152,7 @@ export default function RoundReview({
               const team = getTeam(entry.team_id);
               const color = getTeamColor(entry.team_id, index);
               return (
-                <div
-                  key={entry.team_id}
-                  className="bg-gray-800 rounded-lg p-3 sm:p-4"
-                >
+                <div key={entry.team_id} className="bg-gray-800 rounded-lg p-3 sm:p-4">
                   <div className="flex items-center justify-between mb-2 sm:mb-3">
                     <div className="flex items-center gap-2">
                       <span
@@ -166,8 +160,8 @@ export default function RoundReview({
                           index === 0
                             ? 'text-yellow-400'
                             : index === 1
-                            ? 'text-gray-400'
-                            : 'text-orange-700'
+                              ? 'text-gray-400'
+                              : 'text-orange-700'
                         }`}
                       >
                         #{index + 1}
@@ -222,7 +216,7 @@ export default function RoundReview({
                     )}
                     {(entry.score.no_go_zone_penalty ?? 0) > 0 && (
                       <span className="text-xs px-2 py-0.5 bg-red-900 text-red-300 rounded">
-                        No-go: -{entry.score.no_go_zone_penalty!.toFixed(0)}pts
+                        No-go: -{(entry.score.no_go_zone_penalty ?? 0).toFixed(0)}pts
                       </span>
                     )}
                   </div>

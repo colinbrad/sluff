@@ -13,24 +13,24 @@ export default function DemoTutorial({ step, onDismissWelcome }: DemoTutorialPro
           <h2 className="text-xl font-bold text-gray-900 mb-4">How to Play</h2>
           <ol className="space-y-3 text-gray-700 text-sm mb-6">
             <li>
-              <span className="font-semibold text-green-600">1. Find the markers</span>
-              {' '}— a green start and red end point mark your route targets.
+              <span className="font-semibold text-green-600">1. Find the markers</span> — a green
+              start and red end point mark your route targets.
             </li>
             <li>
-              <span className="font-semibold text-blue-600">2. Draw a route</span>
-              {' '}— click and drag to trace a freehand line from start to end. Press Enter or double-click to finish.
+              <span className="font-semibold text-blue-600">2. Draw a route</span> — click and drag
+              to trace a freehand line from start to end. Press Enter or double-click to finish.
             </li>
             <li>
-              <span className="font-semibold">3. Stay in the corridor</span>
-              {' '}— the shaded area is the safe zone. Routes that stay inside score more points.
+              <span className="font-semibold">3. Stay in the corridor</span> — the shaded area is
+              the safe zone. Routes that stay inside score more points.
             </li>
             <li>
-              <span className="font-semibold text-red-600">4. Avoid no-go zones</span>
-              {' '}— red areas are hazards. Crossing them deducts points.
+              <span className="font-semibold text-red-600">4. Avoid no-go zones</span> — red areas
+              are hazards. Crossing them deducts points.
             </li>
             <li>
-              <span className="font-semibold">5. Submit</span>
-              {' '}— click Submit Route when you're happy with your line.
+              <span className="font-semibold">5. Submit</span> — click Submit Route when you're
+              happy with your line.
             </li>
           </ol>
           <button
@@ -47,7 +47,7 @@ export default function DemoTutorial({ step, onDismissWelcome }: DemoTutorialPro
   const hints: Record<Exclude<DemoStep, 'welcome'>, string> = {
     drawing:
       'Draw your route — click and drag from the green start to the red end. Press Enter or double-click to finish.',
-    ready: 'Route drawn! Click Submit Route when you\'re ready to score it.',
+    ready: "Route drawn! Click Submit Route when you're ready to score it.",
   };
 
   return (

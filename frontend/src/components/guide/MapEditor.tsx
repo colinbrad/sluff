@@ -10,17 +10,19 @@ import {
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import type { GameMap, Round } from '../../types/game';
 import { addNoGoZoneLayers } from '../../utils/mapUtils';
+import { toCoord } from '../../utils/geojson';
 
 type FeatureId = string | number;
 import * as api from '../../services/api';
 import GameMapComponent from '../map/GameMap';
 import MapOverlayControls from '../map/MapOverlayControls';
+import { MOBILE_BREAKPOINT_PX } from '../../constants';
 
-function useMobileBreakpoint(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(
-    () => typeof window !== 'undefined'
+function useMobileBreakpoint(breakpoint = MOBILE_BREAKPOINT_PX) {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined'
       ? window.matchMedia(`(max-width: ${breakpoint - 1}px)`).matches
-      : false
+      : false,
   );
   useEffect(() => {
     const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
@@ -33,11 +35,27 @@ function useMobileBreakpoint(breakpoint = 768) {
 
 type Step = 'idle' | 'start' | 'end' | 'corridor' | 'review';
 
-const STEP_INFO: Record<Exclude<Step, 'idle'>, { label: string; number: number; instruction: string }> = {
-  start: { label: 'Start Point', number: 1, instruction: 'Click on the map to place the start point.' },
+const STEP_INFO: Record<
+  Exclude<Step, 'idle'>,
+  { label: string; number: number; instruction: string }
+> = {
+  start: {
+    label: 'Start Point',
+    number: 1,
+    instruction: 'Click on the map to place the start point.',
+  },
   end: { label: 'End Point', number: 2, instruction: 'Click on the map to place the end point.' },
-  corridor: { label: 'Corridor', number: 3, instruction: 'Click to draw the corridor polygon. Double-click or click the first point to close it.' },
-  review: { label: 'Review', number: 4, instruction: 'Review your round and click Save when ready.' },
+  corridor: {
+    label: 'Corridor',
+    number: 3,
+    instruction:
+      'Click to draw the corridor polygon. Double-click or click the first point to close it.',
+  },
+  review: {
+    label: 'Review',
+    number: 4,
+    instruction: 'Review your round and click Save when ready.',
+  },
 };
 
 export default function MapEditor() {
@@ -129,7 +147,7 @@ export default function MapEditor() {
 
       if (round.start_point?.coordinates) {
         const startMarker = new maplibregl.Marker({ color: '#10B981', scale: 0.8 })
-          .setLngLat(round.start_point.coordinates as [number, number])
+          .setLngLat(toCoord(round.start_point.coordinates))
           .setPopup(new maplibregl.Popup({ offset: 25 }).setText(`#${round.round_number} Start`))
           .addTo(map);
         roundMarkersRef.current.push(startMarker);
@@ -137,7 +155,7 @@ export default function MapEditor() {
 
       if (round.end_point?.coordinates) {
         const endMarker = new maplibregl.Marker({ color: '#EF4444', scale: 0.8 })
-          .setLngLat(round.end_point.coordinates as [number, number])
+          .setLngLat(toCoord(round.end_point.coordinates))
           .setPopup(new maplibregl.Popup({ offset: 25 }).setText(`#${round.round_number} End`))
           .addTo(map);
         roundMarkersRef.current.push(endMarker);
@@ -149,30 +167,33 @@ export default function MapEditor() {
     showSavedRounds();
   }, [showSavedRounds]);
 
-  const initDraw = useCallback((map: maplibregl.Map) => {
-    mapRef.current = map;
+  const initDraw = useCallback(
+    (map: maplibregl.Map) => {
+      mapRef.current = map;
 
-    const draw = new TerraDraw({
-      adapter: new TerraDrawMapLibreGLAdapter({ map }),
-      modes: [
-        new TerraDrawPointMode(),
-        new TerraDrawPolygonMode(),
-        new TerraDrawSelectMode({
-          flags: {
-            point: { feature: { draggable: true } },
-            polygon: {
-              feature: { draggable: true, coordinates: { draggable: true, deletable: true } },
+      const draw = new TerraDraw({
+        adapter: new TerraDrawMapLibreGLAdapter({ map }),
+        modes: [
+          new TerraDrawPointMode(),
+          new TerraDrawPolygonMode(),
+          new TerraDrawSelectMode({
+            flags: {
+              point: { feature: { draggable: true } },
+              polygon: {
+                feature: { draggable: true, coordinates: { draggable: true, deletable: true } },
+              },
             },
-          },
-        }),
-      ],
-    });
+          }),
+        ],
+      });
 
-    draw.start();
-    draw.setMode('select');
-    drawRef.current = draw;
-    showSavedRounds();
-  }, [showSavedRounds]);
+      draw.start();
+      draw.setMode('select');
+      drawRef.current = draw;
+      showSavedRounds();
+    },
+    [showSavedRounds],
+  );
 
   // Set TerraDraw mode when step changes
   useEffect(() => {
@@ -236,7 +257,11 @@ export default function MapEditor() {
           draw.setMode('select');
         } else if (step === 'corridor') {
           if (corridorId.current != null) {
-            try { draw.removeFeatures([corridorId.current]); } catch { /* noop */ }
+            try {
+              draw.removeFeatures([corridorId.current]);
+            } catch {
+              /* noop */
+            }
           }
           corridorId.current = id;
           setPlaced((p) => ({ ...p, corridor: true }));
@@ -244,24 +269,32 @@ export default function MapEditor() {
         }
       } else if (step === 'start' && feature.geometry.type === 'Point') {
         if (startPointId.current != null) {
-          try { draw.removeFeatures([startPointId.current]); } catch { /* noop */ }
+          try {
+            draw.removeFeatures([startPointId.current]);
+          } catch {
+            /* noop */
+          }
         }
         startPointId.current = id;
         setPlaced((p) => ({ ...p, start: true }));
-        if (endPointId.current == null) {
+        if (endPointId.current === null) {
           setStep('end');
-        } else if (corridorId.current == null) {
+        } else if (corridorId.current === null) {
           setStep('corridor');
         } else {
           setStep('review');
         }
       } else if (step === 'end' && feature.geometry.type === 'Point') {
         if (endPointId.current != null) {
-          try { draw.removeFeatures([endPointId.current]); } catch { /* noop */ }
+          try {
+            draw.removeFeatures([endPointId.current]);
+          } catch {
+            /* noop */
+          }
         }
         endPointId.current = id;
         setPlaced((p) => ({ ...p, end: true }));
-        if (corridorId.current == null) {
+        if (corridorId.current === null) {
           setStep('corridor');
         } else {
           setStep('review');
@@ -319,14 +352,15 @@ export default function MapEditor() {
     setPlaced(newPlaced);
 
     const coords = round.corridor.coordinates[0];
-    const bounds = coords.reduce(
-      (b, c) => b.extend(c as [number, number]),
-      new maplibregl.LngLatBounds(
-        coords[0] as [number, number],
-        coords[0] as [number, number]
-      )
-    );
-    map.fitBounds(bounds, { padding: 80 });
+    const seed = coords?.[0];
+    if (coords && seed) {
+      const seedTuple = toCoord(seed);
+      const bounds = coords.reduce(
+        (b, c) => b.extend(toCoord(c)),
+        new maplibregl.LngLatBounds(seedTuple, seedTuple),
+      );
+      map.fitBounds(bounds, { padding: 80 });
+    }
     setRoundName(round.name);
   };
 
@@ -335,15 +369,12 @@ export default function MapEditor() {
     if (!draw || !mapId || !gameMap) return;
 
     const snapshot = draw.getSnapshot();
-    const startFeature = startPointId.current != null
-      ? snapshot.find((f) => f.id === startPointId.current)
-      : null;
-    const endFeature = endPointId.current != null
-      ? snapshot.find((f) => f.id === endPointId.current)
-      : null;
-    const corridorFeature = corridorId.current != null
-      ? snapshot.find((f) => f.id === corridorId.current)
-      : null;
+    const startFeature =
+      startPointId.current != null ? snapshot.find((f) => f.id === startPointId.current) : null;
+    const endFeature =
+      endPointId.current != null ? snapshot.find((f) => f.id === endPointId.current) : null;
+    const corridorFeature =
+      corridorId.current != null ? snapshot.find((f) => f.id === corridorId.current) : null;
 
     if (!startFeature || !endFeature || !corridorFeature) {
       setSaveError('Missing features: ensure start point, end point, and corridor are all placed.');
@@ -434,15 +465,27 @@ export default function MapEditor() {
     if (!draw) return;
 
     if (target === 'start' && startPointId.current != null) {
-      try { draw.removeFeatures([startPointId.current]); } catch { /* noop */ }
+      try {
+        draw.removeFeatures([startPointId.current]);
+      } catch {
+        /* noop */
+      }
       startPointId.current = null;
       setPlaced((p) => ({ ...p, start: false }));
     } else if (target === 'end' && endPointId.current != null) {
-      try { draw.removeFeatures([endPointId.current]); } catch { /* noop */ }
+      try {
+        draw.removeFeatures([endPointId.current]);
+      } catch {
+        /* noop */
+      }
       endPointId.current = null;
       setPlaced((p) => ({ ...p, end: false }));
     } else if (target === 'corridor' && corridorId.current != null) {
-      try { draw.removeFeatures([corridorId.current]); } catch { /* noop */ }
+      try {
+        draw.removeFeatures([corridorId.current]);
+      } catch {
+        /* noop */
+      }
       corridorId.current = null;
       setPlaced((p) => ({ ...p, corridor: false }));
     }
@@ -498,13 +541,13 @@ export default function MapEditor() {
 
       <div className="flex-1 flex flex-col md:flex-row min-h-0">
         {/* Sidebar - full width sheet on mobile, fixed sidebar on desktop */}
-        <div className={`${
-          isMobile
-            ? sidebarOpen ? 'flex' : 'hidden'
-            : 'flex'
-        } md:w-72 bg-white border-b md:border-b-0 md:border-r overflow-y-auto p-4 flex-col gap-4 z-10 ${
-          isMobile && sidebarOpen ? 'flex-1' : ''
-        }`}>
+        <div
+          className={`${
+            isMobile ? (sidebarOpen ? 'flex' : 'hidden') : 'flex'
+          } md:w-72 bg-white border-b md:border-b-0 md:border-r overflow-y-auto p-4 flex-col gap-4 z-10 ${
+            isMobile && sidebarOpen ? 'flex-1' : ''
+          }`}
+        >
           {isEditing ? (
             <>
               {/* Step progress */}
@@ -519,13 +562,16 @@ export default function MapEditor() {
                     const isComplete = placed[s];
 
                     return (
-                      <div key={s} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                        isCurrent
-                          ? 'bg-blue-50 border border-blue-200 text-blue-800'
-                          : isComplete
-                            ? 'bg-green-50 text-green-700'
-                            : 'text-gray-400'
-                      }`}>
+                      <div
+                        key={s}
+                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                          isCurrent
+                            ? 'bg-blue-50 border border-blue-200 text-blue-800'
+                            : isComplete
+                              ? 'bg-green-50 text-green-700'
+                              : 'text-gray-400'
+                        }`}
+                      >
                         <span
                           className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                             isCurrent
@@ -555,9 +601,7 @@ export default function MapEditor() {
               {/* Current step instruction */}
               {step !== 'review' && (
                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-                  <p className="text-sm text-blue-800">
-                    {STEP_INFO[step].instruction}
-                  </p>
+                  <p className="text-sm text-blue-800">{STEP_INFO[step].instruction}</p>
                 </div>
               )}
 
@@ -580,11 +624,18 @@ export default function MapEditor() {
                 ) : (
                   <div className="flex flex-col gap-1">
                     {noGoZoneIds.map((id, i) => (
-                      <div key={String(id)} className="flex items-center justify-between bg-red-50 rounded px-2 py-1.5 text-xs">
+                      <div
+                        key={String(id)}
+                        className="flex items-center justify-between bg-red-50 rounded px-2 py-1.5 text-xs"
+                      >
                         <span className="text-red-800">Zone {i + 1}</span>
                         <button
                           onClick={() => {
-                            try { drawRef.current?.removeFeatures([id]); } catch { /* noop */ }
+                            try {
+                              drawRef.current?.removeFeatures([id]);
+                            } catch {
+                              /* noop */
+                            }
                             setNoGoZoneIds((prev) => prev.filter((z) => z !== id));
                           }}
                           className="text-red-600 hover:text-red-800"
@@ -599,9 +650,7 @@ export default function MapEditor() {
 
               {/* Round name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Round Name
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Round Name</label>
                 <input
                   type="text"
                   value={roundName}
@@ -660,24 +709,20 @@ export default function MapEditor() {
                     Rounds ({gameMap.rounds.length})
                   </h3>
                   {gameMap.rounds.map((round) => (
-                    <div
-                      key={round.id}
-                      className="bg-gray-50 rounded-lg p-3 text-sm"
-                    >
+                    <div key={round.id} className="bg-gray-50 rounded-lg p-3 text-sm">
                       <div className="font-medium text-gray-900">
                         #{round.round_number}: {round.name || 'Untitled'}
                       </div>
                       <div className="flex gap-3 mt-2">
                         <button
                           onClick={() => {
-                            if (round.corridor?.coordinates?.[0]) {
-                              const coords = round.corridor.coordinates[0];
+                            const coords = round.corridor?.coordinates?.[0];
+                            const seed = coords?.[0];
+                            if (coords && seed) {
+                              const seedTuple = toCoord(seed);
                               const bounds = coords.reduce(
-                                (b, c) => b.extend(c as [number, number]),
-                                new maplibregl.LngLatBounds(
-                                  coords[0] as [number, number],
-                                  coords[0] as [number, number]
-                                )
+                                (b, c) => b.extend(toCoord(c)),
+                                new maplibregl.LngLatBounds(seedTuple, seedTuple),
                               );
                               mapRef.current?.fitBounds(bounds, { padding: 80 });
                             }
@@ -707,9 +752,7 @@ export default function MapEditor() {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-gray-500">
-                  No rounds yet. Add one to get started.
-                </p>
+                <p className="text-sm text-gray-500">No rounds yet. Add one to get started.</p>
               )}
             </>
           )}
@@ -717,7 +760,11 @@ export default function MapEditor() {
 
         {/* Map */}
         <div className={`flex-1 relative ${isMobile && sidebarOpen ? 'hidden' : ''}`}>
-          <GameMapComponent onMapReady={initDraw} terrain3d={terrain3d} slopeShading={slopeShading} />
+          <GameMapComponent
+            onMapReady={initDraw}
+            terrain3d={terrain3d}
+            slopeShading={slopeShading}
+          />
           <MapOverlayControls
             terrain3d={terrain3d}
             slopeShading={slopeShading}

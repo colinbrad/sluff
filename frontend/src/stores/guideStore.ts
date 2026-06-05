@@ -17,6 +17,6 @@ export const useGuideStore = create<GuideState>()(
       setAuth: (guide, token) => set({ guide, token }),
       clearAuth: () => set({ guide: null, token: null }),
     }),
-    { name: 'sluff-guide' }
-  )
+    { name: 'sluff-guide' },
+  ),
 );

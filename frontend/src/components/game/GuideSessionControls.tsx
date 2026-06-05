@@ -26,8 +26,7 @@ export default function GuideSessionControls({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const getTeamName = (teamId: string) =>
-    teams.find((t) => t.id === teamId)?.name ?? 'Unknown';
+  const getTeamName = (teamId: string) => teams.find((t) => t.id === teamId)?.name ?? 'Unknown';
 
   const handleKick = async (playerId: string) => {
     setBusy(true);
@@ -127,9 +126,7 @@ export default function GuideSessionControls({
               <div className="space-y-1.5">
                 {routeResults.map((r) => (
                   <div key={r.id} className="flex items-center justify-between gap-2">
-                    <span className="text-white truncate">
-                      {getTeamName(r.team_id)}
-                    </span>
+                    <span className="text-white truncate">{getTeamName(r.team_id)}</span>
                     <button
                       onClick={() => handleClearRoute(r.team_id)}
                       disabled={busy}
