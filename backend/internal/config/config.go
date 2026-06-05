@@ -1,9 +1,10 @@
+// Package config reads runtime configuration from environment variables.
 package config
 
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 )
@@ -15,6 +16,10 @@ type Config struct {
 	JWTSecret   string
 }
 
+// Load reads PORT, DB_PATH, CORS_ORIGINS, and JWT_SECRET from the environment,
+// applying defaults for the first three. If JWT_SECRET is unset in production
+// (HOST=0.0.0.0) the process exits; in development a random ephemeral secret
+// is generated.
 func Load() *Config {
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -36,10 +41,17 @@ func Load() *Config {
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
+		if os.Getenv("HOST") == "0.0.0.0" {
+			slog.Error("JWT_SECRET must be set when HOST=0.0.0.0 (production)")
+			os.Exit(1)
+		}
 		b := make([]byte, 32)
-		rand.Read(b)
+		if _, err := rand.Read(b); err != nil {
+			slog.Error("failed to generate random JWT secret", "err", err)
+			os.Exit(1)
+		}
 		jwtSecret = base64.StdEncoding.EncodeToString(b)
-		log.Println("WARNING: JWT_SECRET not set — using ephemeral secret (sessions won't survive restart)")
+		slog.Warn("JWT_SECRET not set; using ephemeral secret (sessions will not survive restart)")
 	}
 
 	return &Config{

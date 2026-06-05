@@ -16,7 +16,11 @@ describe('extractRounds', () => {
           properties: { name: 'My Route' },
           geometry: {
             type: 'LineString',
-            coordinates: [[-111.58, 40.59], [-111.57, 40.60], [-111.56, 40.61]],
+            coordinates: [
+              [-111.58, 40.59],
+              [-111.57, 40.6],
+              [-111.56, 40.61],
+            ],
           },
         },
       ],
@@ -43,7 +47,10 @@ describe('extractRounds', () => {
           properties: {},
           geometry: {
             type: 'LineString',
-            coordinates: [[-111.58, 40.59], [-111.56, 40.61]],
+            coordinates: [
+              [-111.58, 40.59],
+              [-111.56, 40.61],
+            ],
           },
         },
       ],
@@ -59,7 +66,10 @@ describe('extractRounds', () => {
       properties: {},
       geometry: {
         type: 'LineString' as const,
-        coordinates: [[-111.58, 40.59], [-111.56, 40.61]],
+        coordinates: [
+          [-111.58, 40.59],
+          [-111.56, 40.61],
+        ],
       },
     };
 
@@ -103,8 +113,14 @@ describe('extractRounds', () => {
           geometry: {
             type: 'MultiLineString',
             coordinates: [
-              [[-111.58, 40.59], [-111.56, 40.61]],
-              [[-111.57, 40.60], [-111.55, 40.62]],
+              [
+                [-111.58, 40.59],
+                [-111.56, 40.61],
+              ],
+              [
+                [-111.57, 40.6],
+                [-111.55, 40.62],
+              ],
             ],
           },
         },
@@ -116,7 +132,7 @@ describe('extractRounds', () => {
     expect(rounds[0].name).toBe('Multi (1)');
     expect(rounds[1].name).toBe('Multi (2)');
     expect(rounds[0].start_point.coordinates).toEqual([-111.58, 40.59]);
-    expect(rounds[1].start_point.coordinates).toEqual([-111.57, 40.60]);
+    expect(rounds[1].start_point.coordinates).toEqual([-111.57, 40.6]);
   });
 
   it('skips MultiLineString segments with fewer than 2 coordinates', () => {
@@ -130,7 +146,10 @@ describe('extractRounds', () => {
             type: 'MultiLineString',
             coordinates: [
               [[-111.58, 40.59]], // too short
-              [[-111.57, 40.60], [-111.55, 40.62]], // valid
+              [
+                [-111.57, 40.6],
+                [-111.55, 40.62],
+              ], // valid
             ],
           },
         },
@@ -143,11 +162,11 @@ describe('extractRounds', () => {
 
   it('extracts round from Polygon, using first and mid vertex as start/end', () => {
     const ring = [
-      [-111.60, 40.58],
+      [-111.6, 40.58],
       [-111.54, 40.58],
       [-111.54, 40.62],
-      [-111.60, 40.62],
-      [-111.60, 40.58], // closing
+      [-111.6, 40.62],
+      [-111.6, 40.58], // closing
     ];
     const fc: FeatureCollection = {
       type: 'FeatureCollection',
@@ -182,7 +201,13 @@ describe('extractRounds', () => {
           properties: {},
           geometry: {
             type: 'Polygon',
-            coordinates: [[[-111.60, 40.58], [-111.54, 40.58], [-111.60, 40.58]]],
+            coordinates: [
+              [
+                [-111.6, 40.58],
+                [-111.54, 40.58],
+                [-111.6, 40.58],
+              ],
+            ],
           },
         },
       ],
@@ -252,7 +277,13 @@ describe('parseFile', () => {
   });
 
   it('wraps a bare geometry in a FeatureCollection', async () => {
-    const geometry = { type: 'LineString', coordinates: [[0, 0], [1, 1]] };
+    const geometry = {
+      type: 'LineString',
+      coordinates: [
+        [0, 0],
+        [1, 1],
+      ],
+    };
     const file = makeFile(JSON.stringify(geometry), 'line.json');
     const result = await parseFile(file);
     expect(result.type).toBe('FeatureCollection');

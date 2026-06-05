@@ -18,7 +18,8 @@ export default function SoloSetup() {
   useEffect(() => {
     api.listMaps().then((m) => {
       setMaps(m);
-      if (m.length > 0) setSelectedMap(m[0].id);
+      const first = m[0];
+      if (first) setSelectedMap(first.id);
       setLoading(false);
     });
   }, []);
@@ -54,25 +55,18 @@ export default function SoloSetup() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-lg shadow p-6">
         <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => navigate('/')}
-            className="text-gray-500 hover:text-gray-700"
-          >
+          <button onClick={() => navigate('/')} className="text-gray-500 hover:text-gray-700">
             &larr;
           </button>
           <h2 className="text-xl font-bold">Solo Play</h2>
         </div>
 
         {maps.length === 0 ? (
-          <p className="text-gray-500">
-            No maps available. A guide needs to create one first.
-          </p>
+          <p className="text-gray-500">No maps available. A guide needs to create one first.</p>
         ) : (
           <>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Your Name
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
               <input
                 type="text"
                 value={playerName}
@@ -84,9 +78,7 @@ export default function SoloSetup() {
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Select Map
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Map</label>
               <select
                 value={selectedMap}
                 onChange={(e) => setSelectedMap(e.target.value)}
@@ -115,9 +107,7 @@ export default function SoloSetup() {
               />
             </div>
 
-            {error && (
-              <p className="text-red-600 text-sm mb-4">{error}</p>
-            )}
+            {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
 
             <button
               onClick={handleStart}

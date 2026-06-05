@@ -1,3 +1,5 @@
+// Package geo provides geospatial helpers used by the scoring engine:
+// sampling along a LineString, point-in-polygon, and distance utilities.
 package geo
 
 import (

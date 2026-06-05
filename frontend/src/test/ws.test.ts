@@ -76,7 +76,9 @@ describe('GameWebSocket', () => {
     ws.onMessage(handler);
 
     const mockWs = (ws as unknown as { ws: MockWebSocket }).ws;
-    mockWs.onmessage?.({ data: JSON.stringify({ type: 'game_state', payload: { phase: 'playing' } }) });
+    mockWs.onmessage?.({
+      data: JSON.stringify({ type: 'game_state', payload: { phase: 'playing' } }),
+    });
 
     expect(handler).toHaveBeenCalledWith({ type: 'game_state', payload: { phase: 'playing' } });
   });

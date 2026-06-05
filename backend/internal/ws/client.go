@@ -1,9 +1,11 @@
+// Package ws implements the WebSocket hub and per-connection client used for
+// real-time cursor and drawing updates between teammates within a session.
 package ws
 
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/coder/websocket"
@@ -18,6 +20,7 @@ const (
 	maxMsgSize = 64 * 1024 // 64KB
 )
 
+// Client is a single WebSocket connection associated with a player in a session.
 type Client struct {
 	hub       *Hub
 	conn      *websocket.Conn
@@ -27,6 +30,7 @@ type Client struct {
 	TeamID    string
 }
 
+// NewClient wraps a websocket.Conn for a player within a session and team.
 func NewClient(hub *Hub, conn *websocket.Conn, sessionID, playerID, teamID string) *Client {
 	return &Client{
 		hub:       hub,
@@ -38,10 +42,12 @@ func NewClient(hub *Hub, conn *websocket.Conn, sessionID, playerID, teamID strin
 	}
 }
 
+// ReadPump reads inbound WebSocket messages until ctx is cancelled or the peer
+// closes. It runs as a long-lived goroutine started by the connection handler.
 func (c *Client) ReadPump(ctx context.Context) {
 	defer func() {
 		c.hub.Unregister(c)
-		c.conn.Close(websocket.StatusNormalClosure, "")
+		_ = c.conn.Close(websocket.StatusNormalClosure, "")
 	}()
 
 	c.conn.SetReadLimit(maxMsgSize)
@@ -50,7 +56,7 @@ func (c *Client) ReadPump(ctx context.Context) {
 		_, data, err := c.conn.Read(ctx)
 		if err != nil {
 			if websocket.CloseStatus(err) != -1 {
-				log.Printf("WebSocket closed for player %s: %v", c.PlayerID, err)
+				slog.Info("websocket closed", "player_id", c.PlayerID, "err", err)
 			}
 			return
 		}
@@ -64,11 +70,13 @@ func (c *Client) ReadPump(ctx context.Context) {
 	}
 }
 
+// WritePump writes outbound messages and periodic pings until ctx is cancelled
+// or a write fails.
 func (c *Client) WritePump(ctx context.Context) {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close(websocket.StatusNormalClosure, "")
+		_ = c.conn.Close(websocket.StatusNormalClosure, "")
 	}()
 
 	for {
@@ -108,7 +116,7 @@ func (c *Client) handleMessage(msg model.WSMessage) {
 		// Broadcast cursor to teammates
 		c.hub.BroadcastToTeam(c.SessionID, c.TeamID, model.WSMessage{
 			Type: model.MsgCursorUpdate,
-			Payload: mustMarshal(model.CursorUpdatePayload{
+			Payload: safeMarshal(model.CursorUpdatePayload{
 				PlayerID: c.PlayerID,
 				Lat:      payload.Lat,
 				Lng:      payload.Lng,
@@ -125,7 +133,7 @@ func (c *Client) handleMessage(msg model.WSMessage) {
 		// Broadcast drawing to teammates
 		c.hub.BroadcastToTeam(c.SessionID, c.TeamID, model.WSMessage{
 			Type:    model.MsgDrawingUpdate,
-			Payload: mustMarshal(payload),
+			Payload: safeMarshal(payload),
 		}, c.PlayerID)
 
 	case model.MsgPing:
@@ -133,10 +141,5 @@ func (c *Client) handleMessage(msg model.WSMessage) {
 	}
 }
 
-func mustMarshal(v any) json.RawMessage {
-	b, err := json.Marshal(v)
-	if err != nil {
-		panic(err)
-	}
-	return b
-}
+// safeMarshal is an alias for model.SafeMarshal kept for call-site brevity.
+func safeMarshal(v any) json.RawMessage { return model.SafeMarshal(v) }

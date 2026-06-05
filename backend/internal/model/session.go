@@ -2,11 +2,14 @@ package model
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
+// GamePhase enumerates the lifecycle states of a game session.
 type GamePhase string
 
+// Game phase constants.
 const (
 	PhaseWaiting  GamePhase = "waiting"
 	PhasePlaying  GamePhase = "playing"
@@ -14,6 +17,7 @@ const (
 	PhaseFinished GamePhase = "finished"
 )
 
+// Session is a single playthrough of a map by one or more teams.
 type Session struct {
 	ID           string    `json:"id"`
 	MapID        string    `json:"map_id"`
@@ -28,6 +32,7 @@ type Session struct {
 	Players      []Player  `json:"players,omitempty"`
 }
 
+// Team groups players who collaborate on route submissions within a session.
 type Team struct {
 	ID        string `json:"id"`
 	SessionID string `json:"session_id"`
@@ -35,6 +40,7 @@ type Team struct {
 	Color     string `json:"color"`
 }
 
+// Player is a participant in a session, optionally assigned to a team.
 type Player struct {
 	ID        string `json:"id"`
 	SessionID string `json:"session_id"`
@@ -43,6 +49,7 @@ type Player struct {
 	IsOnline  bool   `json:"is_online"`
 }
 
+// TeamRoute is a team's submitted GeoJSON LineString for a round, along with its score.
 type TeamRoute struct {
 	ID          string        `json:"id"`
 	SessionID   string        `json:"session_id"`
@@ -54,6 +61,7 @@ type TeamRoute struct {
 	SubmittedAt *time.Time    `json:"submitted_at"`
 }
 
+// ScoreDetails is the per-component breakdown produced when scoring a route.
 type ScoreDetails struct {
 	TotalPoints       int     `json:"total_points"`
 	PointsInCorridor  int     `json:"points_in_corridor"`
@@ -67,19 +75,21 @@ type ScoreDetails struct {
 	FinalScore        float64 `json:"final_score"`
 }
 
+// ToJSON encodes the score details as a JSON string for database storage.
 func (sd ScoreDetails) ToJSON() string {
 	b, _ := json.Marshal(sd)
 	return string(b)
 }
 
+// ScoreDetailsFromJSON decodes a JSON-encoded ScoreDetails. Returns (nil, nil)
+// when s is empty.
 func ScoreDetailsFromJSON(s string) (*ScoreDetails, error) {
 	if s == "" {
 		return nil, nil
 	}
 	var sd ScoreDetails
-	err := json.Unmarshal([]byte(s), &sd)
-	if err != nil {
-		return nil, err
+	if err := json.Unmarshal([]byte(s), &sd); err != nil {
+		return nil, fmt.Errorf("decode score details: %w", err)
 	}
 	return &sd, nil
 }

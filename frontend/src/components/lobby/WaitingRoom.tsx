@@ -17,7 +17,6 @@ export default function WaitingRoom() {
   const guide = useGuideStore((s) => s.guide);
   const [session, setLocalSession] = useState<Session | null>(null);
   const [playerName, setPlayerName] = useState('');
-  const [, setWs] = useState<GameWebSocket | null>(null);
 
   const refreshSession = useCallback(async () => {
     if (!sessionId) return;
@@ -27,6 +26,8 @@ export default function WaitingRoom() {
   }, [sessionId, setSession]);
 
   useEffect(() => {
+    // Mount-time data fetch; the cascading setState is intentional.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshSession();
   }, [refreshSession]);
 
@@ -43,7 +44,6 @@ export default function WaitingRoom() {
         navigate(`/session/${sessionId}/play`);
       }
     });
-    setWs(socket);
     return () => socket.close();
   }, [sessionId, player, navigate, refreshSession]);
 
@@ -57,11 +57,9 @@ export default function WaitingRoom() {
     if (!sessionId || !session) return;
     const teamIndex = session.teams?.length || 0;
     if (teamIndex >= 4) return;
-    await api.createTeam(
-      sessionId,
-      TEAM_NAMES[teamIndex],
-      TEAM_COLORS[teamIndex]
-    );
+    const name = TEAM_NAMES[teamIndex] ?? `Team ${teamIndex + 1}`;
+    const color = TEAM_COLORS[teamIndex] ?? '#3B82F6';
+    await api.createTeam(sessionId, name, color);
     refreshSession();
   };
 
@@ -96,9 +94,7 @@ export default function WaitingRoom() {
             Code: <span className="font-mono font-bold">{session.code}</span>
           </p>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Your Name
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
             <input
               type="text"
               value={playerName}
@@ -156,14 +152,11 @@ export default function WaitingRoom() {
           </div>
 
           {!session.teams?.length ? (
-            <p className="text-gray-500 text-sm">
-              No teams yet. Create teams to get started.
-            </p>
+            <p className="text-gray-500 text-sm">No teams yet. Create teams to get started.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {session.teams.map((team) => {
-                const teamPlayers =
-                  session.players?.filter((p) => p.team_id === team.id) || [];
+                const teamPlayers = session.players?.filter((p) => p.team_id === team.id) || [];
                 const isOnTeam = player.team_id === team.id;
 
                 return (
@@ -183,9 +176,7 @@ export default function WaitingRoom() {
                         </button>
                       )}
                       {isOnTeam && (
-                        <span className="text-sm text-green-600 font-medium">
-                          Your Team
-                        </span>
+                        <span className="text-sm text-green-600 font-medium">Your Team</span>
                       )}
                     </div>
                     <div className="space-y-1">
@@ -196,9 +187,7 @@ export default function WaitingRoom() {
                         </div>
                       ))}
                       {teamPlayers.length === 0 && (
-                        <div className="text-sm text-gray-400 italic">
-                          No players yet
-                        </div>
+                        <div className="text-sm text-gray-400 italic">No players yet</div>
                       )}
                     </div>
                   </div>
@@ -216,10 +205,7 @@ export default function WaitingRoom() {
               {session.players
                 ?.filter((p) => !p.team_id)
                 .map((p) => (
-                  <span
-                    key={p.id}
-                    className="px-3 py-1 bg-gray-100 rounded-full text-sm"
-                  >
+                  <span key={p.id} className="px-3 py-1 bg-gray-100 rounded-full text-sm">
                     {p.name}
                     {p.id === player.id && ' (you)'}
                   </span>

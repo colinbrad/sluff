@@ -1,6 +1,10 @@
+// Package game implements scoring for a player-submitted route against a
+// round's corridor, endpoints, and optional no-go zones.
 package game
 
 import (
+	"errors"
+	"fmt"
 	"math"
 
 	"github.com/paulmach/orb"
@@ -17,16 +21,16 @@ const (
 )
 
 // ScoreRoute scores a player-drawn route against a round's corridor and no-go zones.
-// pathJSON is a GeoJSON geometry (LineString).
+// pathJSON is a GeoJSON LineString geometry.
 func ScoreRoute(pathJSON string, round *model.Round) (model.ScoreDetails, error) {
 	geom, err := geojson.UnmarshalGeometry([]byte(pathJSON))
 	if err != nil {
-		return model.ScoreDetails{}, err
+		return model.ScoreDetails{}, fmt.Errorf("decode path: %w", err)
 	}
 
 	route, ok := geom.Geometry().(orb.LineString)
 	if !ok {
-		return model.ScoreDetails{}, err
+		return model.ScoreDetails{}, errors.New("path must be a LineString geometry")
 	}
 
 	return scoreLineAgainstCorridor(route, round.Corridor, round.StartPoint, round.EndPoint, round.NoGoZones), nil

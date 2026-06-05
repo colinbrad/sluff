@@ -62,9 +62,7 @@ export default function GameHeader({
           <span className="text-xs sm:text-sm text-blue-600 font-medium">Scoring...</span>
         )}
         {phase === 'finished' && (
-          <span className="text-xs sm:text-sm text-purple-600 font-medium">
-            Game Over
-          </span>
+          <span className="text-xs sm:text-sm text-purple-600 font-medium">Game Over</span>
         )}
       </div>
     </header>

@@ -1,3 +1,4 @@
+// Package store defines the persistence interface and its SQLite implementation.
 package store
 
 import "github.com/colinbradley/sluff/internal/model"

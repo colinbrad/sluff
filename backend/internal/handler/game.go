@@ -14,15 +14,20 @@ import (
 	"github.com/colinbradley/sluff/internal/ws"
 )
 
+// GameHandler implements endpoints that advance game flow: starting rounds,
+// submitting routes, and fetching scores.
 type GameHandler struct {
 	store store.Store
 	hub   *ws.Hub
 }
 
+// NewGameHandler constructs a GameHandler backed by the given store and hub.
 func NewGameHandler(s store.Store, hub *ws.Hub) *GameHandler {
 	return &GameHandler{store: s, hub: hub}
 }
 
+// StartGame advances the session to its next round (or to PhaseFinished if the
+// last round is complete) and broadcasts the new round to all connected clients.
 func (h *GameHandler) StartGame(w http.ResponseWriter, r *http.Request) {
 	sessionID := chi.URLParam(r, "sessionID")
 
@@ -48,17 +53,12 @@ func (h *GameHandler) StartGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check teams have players
-	teams, err := h.store.GetTeamsBySession(sessionID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to check teams")
-		return
-	}
+	// sess.Teams was already loaded by GetSession; no need for a second query.
 	minTeams := 2
 	if sess.IsSolo {
 		minTeams = 1
 	}
-	if len(teams) < minTeams {
+	if len(sess.Teams) < minTeams {
 		writeError(w, http.StatusBadRequest, "not enough teams")
 		return
 	}
@@ -68,7 +68,10 @@ func (h *GameHandler) StartGame(w http.ResponseWriter, r *http.Request) {
 	if nextRound > len(rounds) {
 		sess.Phase = model.PhaseFinished
 		sess.CurrentRound = len(rounds)
-		h.store.UpdateSession(sess)
+		if err := h.store.UpdateSession(sess); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to update session")
+			return
+		}
 		writeJSON(w, http.StatusOK, sess)
 		return
 	}
@@ -86,11 +89,11 @@ func (h *GameHandler) StartGame(w http.ResponseWriter, r *http.Request) {
 
 	h.hub.BroadcastToSession(sessionID, model.WSMessage{
 		Type:    model.MsgRoundStart,
-		Payload: mustMarshal(payload),
+		Payload: safeMarshal(payload),
 	})
 	h.hub.BroadcastToSession(sessionID, model.WSMessage{
 		Type: model.MsgGameState,
-		Payload: mustMarshal(model.GameStatePayload{
+		Payload: safeMarshal(model.GameStatePayload{
 			Phase:         model.PhasePlaying,
 			CurrentRound:  nextRound,
 			TimeRemaining: sess.TimeLimitSec,
@@ -100,6 +103,8 @@ func (h *GameHandler) StartGame(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, sess)
 }
 
+// SubmitRoute scores a team's GeoJSON LineString against the round's corridor
+// and persists the result. Only valid during PhasePlaying; rejects duplicates.
 func (h *GameHandler) SubmitRoute(w http.ResponseWriter, r *http.Request) {
 	sessionID := chi.URLParam(r, "sessionID")
 	roundID := chi.URLParam(r, "roundID")
@@ -113,10 +118,46 @@ func (h *GameHandler) SubmitRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get the round for scoring
+	sess, err := h.store.GetSession(sessionID)
+	if err != nil || sess == nil {
+		writeError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	if sess.Phase != model.PhasePlaying {
+		writeError(w, http.StatusBadRequest, "session is not in playing phase")
+		return
+	}
+
 	round, err := h.store.GetRound(roundID)
 	if err != nil || round == nil {
 		writeError(w, http.StatusNotFound, "round not found")
+		return
+	}
+	if round.MapID != sess.MapID {
+		writeError(w, http.StatusBadRequest, "round does not belong to this session's map")
+		return
+	}
+
+	// sess.Teams was already loaded by GetSession; no need for a second query.
+	validTeam := false
+	for _, t := range sess.Teams {
+		if t.ID == req.TeamID {
+			validTeam = true
+			break
+		}
+	}
+	if !validTeam {
+		writeError(w, http.StatusForbidden, "team does not belong to this session")
+		return
+	}
+
+	existing, err := h.store.GetTeamRoute(roundID, req.TeamID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to check existing route")
+		return
+	}
+	if existing != nil {
+		writeError(w, http.StatusConflict, "route already submitted for this team and round")
 		return
 	}
 
@@ -130,7 +171,6 @@ func (h *GameHandler) SubmitRoute(w http.ResponseWriter, r *http.Request) {
 		SubmittedAt: &now,
 	}
 
-	// Score the route
 	details, err := game.ScoreRoute(string(req.Path), round)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "failed to score route: "+err.Error())
@@ -148,6 +188,7 @@ func (h *GameHandler) SubmitRoute(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, route)
 }
 
+// GetScores returns all submitted team routes (with scores) for a round.
 func (h *GameHandler) GetScores(w http.ResponseWriter, r *http.Request) {
 	roundID := chi.URLParam(r, "roundID")
 
@@ -163,6 +204,8 @@ func (h *GameHandler) GetScores(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, routes)
 }
 
+// GetCurrentRound returns the round that is currently in progress for a session,
+// serialized as GeoJSON for the frontend.
 func (h *GameHandler) GetCurrentRound(w http.ResponseWriter, r *http.Request) {
 	sessionID := chi.URLParam(r, "sessionID")
 
@@ -186,6 +229,8 @@ func (h *GameHandler) GetCurrentRound(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, roundToGeoJSON(&round))
 }
 
+// DemoNextRound is the public, unauthenticated round advancement endpoint used
+// by demo sessions; it does not broadcast over WebSocket.
 func (h *GameHandler) DemoNextRound(w http.ResponseWriter, r *http.Request) {
 	sessionID := chi.URLParam(r, "sessionID")
 
@@ -209,8 +254,11 @@ func (h *GameHandler) DemoNextRound(w http.ResponseWriter, r *http.Request) {
 	if nextRound > len(rounds) {
 		sess.Phase = model.PhaseFinished
 		sess.CurrentRound = len(rounds)
-		h.store.UpdateSession(sess)
-		writeJSON(w, http.StatusOK, map[string]interface{}{"session": sess, "round": nil})
+		if err := h.store.UpdateSession(sess); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to update session")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"session": sess, "round": nil})
 		return
 	}
 
@@ -222,16 +270,8 @@ func (h *GameHandler) DemoNextRound(w http.ResponseWriter, r *http.Request) {
 	}
 
 	round := rounds[nextRound-1]
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"session": sess,
 		"round":   roundToGeoJSON(&round),
 	})
-}
-
-func mustMarshal(v any) json.RawMessage {
-	b, err := json.Marshal(v)
-	if err != nil {
-		panic(err)
-	}
-	return b
 }

@@ -39,7 +39,7 @@ describe('API client', () => {
       expect(result).toEqual(maps);
       expect(mockFetch).toHaveBeenCalledWith(
         '/api/guide/maps',
-        expect.objectContaining({ headers: { 'Content-Type': 'application/json' } })
+        expect.objectContaining({ headers: { 'Content-Type': 'application/json' } }),
       );
     });
   });
@@ -56,7 +56,7 @@ describe('API client', () => {
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({ name: 'New Map', description: 'Desc' }),
-        })
+        }),
       );
     });
   });
@@ -74,18 +74,20 @@ describe('API client', () => {
 
   describe('deleteMap', () => {
     it('sends DELETE and returns undefined for 204', async () => {
-      mockFetch.mockReturnValueOnce(Promise.resolve({
-        ok: true,
-        status: 204,
-        statusText: 'No Content',
-        json: () => Promise.reject(new Error('no body')),
-      }));
+      mockFetch.mockReturnValueOnce(
+        Promise.resolve({
+          ok: true,
+          status: 204,
+          statusText: 'No Content',
+          json: () => Promise.reject(new Error('no body')),
+        }),
+      );
 
       const result = await api.deleteMap('m1');
       expect(result).toBeUndefined();
       expect(mockFetch).toHaveBeenCalledWith(
         '/api/guide/maps/m1',
-        expect.objectContaining({ method: 'DELETE' })
+        expect.objectContaining({ method: 'DELETE' }),
       );
     });
   });
@@ -97,7 +99,18 @@ describe('API client', () => {
         name: 'Round 1',
         start_point: { type: 'Point' as const, coordinates: [10, 47] },
         end_point: { type: 'Point' as const, coordinates: [10.1, 47.1] },
-        corridor: { type: 'Polygon' as const, coordinates: [[[10, 47], [10.1, 47], [10.1, 47.1], [10, 47.1], [10, 47]]] },
+        corridor: {
+          type: 'Polygon' as const,
+          coordinates: [
+            [
+              [10, 47],
+              [10.1, 47],
+              [10.1, 47.1],
+              [10, 47.1],
+              [10, 47],
+            ],
+          ],
+        },
       };
       mockFetch.mockReturnValueOnce(jsonResponse({ id: 'r1', ...roundData }, 201));
 
@@ -105,7 +118,7 @@ describe('API client', () => {
       expect(result.id).toBe('r1');
       expect(mockFetch).toHaveBeenCalledWith(
         '/api/guide/maps/m1/rounds',
-        expect.objectContaining({ method: 'POST' })
+        expect.objectContaining({ method: 'POST' }),
       );
     });
   });
@@ -154,7 +167,13 @@ describe('API client', () => {
       const route = { id: 'tr1', score: 850 };
       mockFetch.mockReturnValueOnce(jsonResponse(route, 201));
 
-      const path: GeoJSON.LineString = { type: 'LineString', coordinates: [[10, 47], [10.1, 47.1]] };
+      const path: GeoJSON.LineString = {
+        type: 'LineString',
+        coordinates: [
+          [10, 47],
+          [10.1, 47.1],
+        ],
+      };
       const result = await api.submitRoute('s1', 'r1', 't1', path);
       expect(result).toEqual(route);
     });
@@ -168,12 +187,14 @@ describe('API client', () => {
     });
 
     it('uses statusText when body has no error field', async () => {
-      mockFetch.mockReturnValueOnce(Promise.resolve({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-        json: () => Promise.reject(new Error('no json')),
-      }));
+      mockFetch.mockReturnValueOnce(
+        Promise.resolve({
+          ok: false,
+          status: 500,
+          statusText: 'Internal Server Error',
+          json: () => Promise.reject(new Error('no json')),
+        }),
+      );
 
       await expect(api.listMaps()).rejects.toThrow('Internal Server Error');
     });

@@ -1,6 +1,10 @@
+// Package middleware contains HTTP middleware: JWT guide authentication and
+// IP-based rate limiting.
 package middleware
 
 import (
+	"context"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -8,30 +12,40 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// RateLimiter is an IP-based token bucket rate limiter.
+type entry struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
+}
+
+// RateLimiter is an IP-based token bucket rate limiter with a background
+// cleanup goroutine tied to a context for graceful shutdown.
 type RateLimiter struct {
-	mu       sync.RWMutex
-	limiters map[string]*rate.Limiter
-	r        rate.Limit
-	b        int
+	mu      sync.Mutex
+	entries map[string]*entry
+	r       rate.Limit
+	b       int
 }
 
-// NewRateLimiter creates a rate limiter with the given requests per second (r)
-// and burst size (b).
-func NewRateLimiter(r rate.Limit, b int) *RateLimiter {
-	return &RateLimiter{
-		limiters: make(map[string]*rate.Limiter),
-		r:        r,
-		b:        b,
+// NewRateLimiter creates a rate limiter with r requests per second and burst
+// size b. The cleanup goroutine stops when ctx is cancelled.
+func NewRateLimiter(ctx context.Context, r rate.Limit, b int) *RateLimiter {
+	rl := &RateLimiter{
+		entries: make(map[string]*entry),
+		r:       r,
+		b:       b,
 	}
+	go rl.cleanup(ctx)
+	return rl
 }
 
-// Limit returns middleware that rate limits by IP address.
+// Limit returns middleware that rate limits by client IP address.
 func (rl *RateLimiter) Limit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := r.RemoteAddr
-		limiter := rl.limiterFor(ip)
-		if !limiter.Allow() {
+		ip, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			ip = r.RemoteAddr
+		}
+		if !rl.limiterFor(ip).Allow() {
 			http.Error(w, `{"error":"rate limited"}`, http.StatusTooManyRequests)
 			return
 		}
@@ -43,33 +57,36 @@ func (rl *RateLimiter) limiterFor(ip string) *rate.Limiter {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	if limiter, exists := rl.limiters[ip]; exists {
-		return limiter
+	if e, ok := rl.entries[ip]; ok {
+		e.lastSeen = time.Now()
+		return e.limiter
 	}
 
-	limiter := rate.NewLimiter(rl.r, rl.b)
-	rl.limiters[ip] = limiter
-
-	// Cleanup old limiters every 5 minutes
-	if len(rl.limiters) == 1 {
-		go rl.cleanup()
+	e := &entry{
+		limiter:  rate.NewLimiter(rl.r, rl.b),
+		lastSeen: time.Now(),
 	}
-
-	return limiter
+	rl.entries[ip] = e
+	return e.limiter
 }
 
-func (rl *RateLimiter) cleanup() {
+func (rl *RateLimiter) cleanup(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		rl.mu.Lock()
-		// Remove entries that haven't been used recently
-		for ip, limiter := range rl.limiters {
-			if limiter.AllowN(time.Now(), 0) {
-				delete(rl.limiters, ip)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			cutoff := time.Now().Add(-10 * time.Minute)
+			rl.mu.Lock()
+			for ip, e := range rl.entries {
+				if e.lastSeen.Before(cutoff) {
+					delete(rl.entries, ip)
+				}
 			}
+			rl.mu.Unlock()
 		}
-		rl.mu.Unlock()
 	}
 }

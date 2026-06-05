@@ -7,7 +7,12 @@ import Home from '../components/Home';
 vi.mock('maplibre-gl', () => ({
   default: {
     Map: vi.fn(),
-    Marker: vi.fn(() => ({ setLngLat: vi.fn().mockReturnThis(), setPopup: vi.fn().mockReturnThis(), addTo: vi.fn().mockReturnThis(), remove: vi.fn() })),
+    Marker: vi.fn(() => ({
+      setLngLat: vi.fn().mockReturnThis(),
+      setPopup: vi.fn().mockReturnThis(),
+      addTo: vi.fn().mockReturnThis(),
+      remove: vi.fn(),
+    })),
     Popup: vi.fn(() => ({ setText: vi.fn().mockReturnThis() })),
     LngLatBounds: vi.fn(),
   },
@@ -26,7 +31,7 @@ describe('Home page', () => {
     render(
       <MemoryRouter>
         <Home />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByText('Sluff')).toBeInTheDocument();
@@ -38,7 +43,7 @@ describe('Home page', () => {
     render(
       <MemoryRouter>
         <Home />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     const buttons = screen.getAllByRole('button');
@@ -52,7 +57,7 @@ describe('Home page', () => {
     render(
       <MemoryRouter>
         <Home />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByText('Draw a safe backcountry ski tour')).toBeInTheDocument();

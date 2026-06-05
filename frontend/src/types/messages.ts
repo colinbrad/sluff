@@ -44,7 +44,7 @@ export interface PlayerEventPayload {
   player: Player;
 }
 
-export interface RoundStartPayload extends Round {}
+export type RoundStartPayload = Round;
 
 export interface ScoresPayload {
   team_scores: Array<{

@@ -12,6 +12,10 @@ services:
     envVars:
       - key: DB_PATH
         value: /app/data/sluff.db
+      # HOST=0.0.0.0 is the production discriminator: it enables JSON-formatted
+      # slog output and makes a missing JWT_SECRET fatal at startup.
+      - key: HOST
+        value: 0.0.0.0
       - key: CORS_ORIGINS
         sync: false
       - key: LITESTREAM_ENDPOINT
@@ -23,6 +27,10 @@ services:
       - key: LITESTREAM_SECRET_ACCESS_KEY
         sync: false
       - key: JWT_SECRET
+        sync: false
+      - key: DEFAULT_GUIDE_USERNAME
+        sync: false
+      - key: DEFAULT_GUIDE_PASSWORD
         sync: false
 
   - type: web
