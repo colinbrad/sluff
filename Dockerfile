@@ -44,6 +44,11 @@ RUN useradd --create-home --shell /bin/bash appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
+# Bind all interfaces inside the container; the container boundary (and
+# published ports) is the isolation, not the listen address. The server
+# defaults to 127.0.0.1 for host-OS runs (`make dev`).
+ENV HOST=0.0.0.0
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/api/health || exit 1

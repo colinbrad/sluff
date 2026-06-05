@@ -10,6 +10,7 @@ import (
 )
 
 type Config struct {
+	Host        string
 	Port        string
 	DBPath      string
 	CORSOrigins []string
@@ -24,6 +25,14 @@ func Load() *Config {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
+	}
+
+	// Default to loopback so the many unauthenticated endpoints (player join,
+	// route submit, demo, WebSocket) are not exposed to the local network.
+	// Render sets HOST=0.0.0.0 so the container accepts external traffic.
+	host := os.Getenv("HOST")
+	if host == "" {
+		host = "127.0.0.1"
 	}
 
 	dbPath := os.Getenv("DB_PATH")
@@ -55,6 +64,7 @@ func Load() *Config {
 	}
 
 	return &Config{
+		Host:        host,
 		Port:        port,
 		DBPath:      dbPath,
 		CORSOrigins: corsOrigins,
