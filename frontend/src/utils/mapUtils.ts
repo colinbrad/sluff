@@ -1,5 +1,6 @@
 import maplibregl from 'maplibre-gl';
 import type { Round } from '../types/game';
+import { toCoord } from './geojson';
 
 /**
  * Adds start (green) and end (red) markers for a round to the map.
@@ -11,7 +12,7 @@ export function addRoundMarkers(map: maplibregl.Map, round: Round): maplibregl.M
   if (round.start_point?.coordinates) {
     markers.push(
       new maplibregl.Marker({ color: '#10B981' })
-        .setLngLat(round.start_point.coordinates as [number, number])
+        .setLngLat(toCoord(round.start_point.coordinates))
         .setPopup(new maplibregl.Popup().setText('Start'))
         .addTo(map),
     );
@@ -20,7 +21,7 @@ export function addRoundMarkers(map: maplibregl.Map, round: Round): maplibregl.M
   if (round.end_point?.coordinates) {
     markers.push(
       new maplibregl.Marker({ color: '#EF4444' })
-        .setLngLat(round.end_point.coordinates as [number, number])
+        .setLngLat(toCoord(round.end_point.coordinates))
         .setPopup(new maplibregl.Popup().setText('End'))
         .addTo(map),
     );

@@ -5,6 +5,7 @@ import buffer from '@turf/buffer';
 import type { Feature, FeatureCollection, LineString } from 'geojson';
 import GameMapComponent from '../map/GameMap';
 import * as api from '../../services/api';
+import { CORRIDOR_BUFFER_KM } from '../../constants';
 
 export type FeatureLabel = 'start' | 'end' | 'corridor' | 'no-go' | null;
 
@@ -43,9 +44,7 @@ function geomKind(f: Feature): 'point' | 'polygon' | 'line' | 'other' {
 }
 
 function featureName(f: Feature, index: number): string {
-  return (f.properties?.name as string)
-    || (f.properties?.Name as string)
-    || `Feature ${index + 1}`;
+  return (f.properties?.name as string) || (f.properties?.Name as string) || `Feature ${index + 1}`;
 }
 
 function buildFC(items: LabeledFeature[], selectedId: string | null): FeatureCollection {
@@ -66,7 +65,11 @@ function buildFC(items: LabeledFeature[], selectedId: string | null): FeatureCol
 
 function collectBounds(features: Feature[]): maplibregl.LngLatBounds | null {
   const coords: [number, number][] = [];
-  const add = (c: number[]) => coords.push([c[0], c[1]]);
+  const add = (c: number[]) => {
+    if (c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number') {
+      coords.push([c[0], c[1]]);
+    }
+  };
   for (const f of features) {
     const g = f.geometry;
     if (!g) continue;
@@ -74,14 +77,12 @@ function collectBounds(features: Feature[]): maplibregl.LngLatBounds | null {
     else if (g.type === 'MultiPoint') g.coordinates.forEach(add);
     else if (g.type === 'LineString') g.coordinates.forEach(add);
     else if (g.type === 'MultiLineString') g.coordinates.forEach((l) => l.forEach(add));
-    else if (g.type === 'Polygon') g.coordinates[0].forEach(add);
-    else if (g.type === 'MultiPolygon') g.coordinates.forEach((p) => p[0].forEach(add));
+    else if (g.type === 'Polygon') g.coordinates[0]?.forEach(add);
+    else if (g.type === 'MultiPolygon') g.coordinates.forEach((p) => p[0]?.forEach(add));
   }
-  if (coords.length === 0) return null;
-  return coords.reduce(
-    (b, c) => b.extend(c),
-    new maplibregl.LngLatBounds(coords[0], coords[0])
-  );
+  const seed = coords[0];
+  if (!seed) return null;
+  return coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(seed, seed));
 }
 
 export default function ImportLabeler() {
@@ -90,7 +91,7 @@ export default function ImportLabeler() {
   const state = location.state as ImportLocationState | null;
 
   const [items, setItems] = useState<LabeledFeature[]>(() =>
-    (state?.features ?? []).map((f, i) => ({ id: String(i), feature: f, label: null }))
+    (state?.features ?? []).map((f, i) => ({ id: String(i), feature: f, label: null })),
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mapName, setMapName] = useState(state?.mapName ?? '');
@@ -105,7 +106,9 @@ export default function ImportLabeler() {
 
   // Keep map source in sync
   useEffect(() => {
-    const src = mapRef.current?.getSource('import-features') as maplibregl.GeoJSONSource | undefined;
+    const src = mapRef.current?.getSource('import-features') as
+      | maplibregl.GeoJSONSource
+      | undefined;
     src?.setData(buildFC(items, selectedId));
   }, [items, selectedId]);
 
@@ -122,7 +125,19 @@ export default function ImportLabeler() {
       source: 'import-features',
       filter: ['match', ['geometry-type'], ['Polygon', 'MultiPolygon'], true, false],
       paint: {
-        'fill-color': ['match', ['get', '_label'], 'start', '#10B981', 'end', '#EF4444', 'corridor', '#3B82F6', 'no-go', '#DC2626', '#9CA3AF'],
+        'fill-color': [
+          'match',
+          ['get', '_label'],
+          'start',
+          '#10B981',
+          'end',
+          '#EF4444',
+          'corridor',
+          '#3B82F6',
+          'no-go',
+          '#DC2626',
+          '#9CA3AF',
+        ],
         'fill-opacity': ['case', ['==', ['get', '_sel'], 1], 0.45, 0.2],
       },
     });
@@ -133,7 +148,19 @@ export default function ImportLabeler() {
       source: 'import-features',
       filter: ['match', ['geometry-type'], ['Polygon', 'MultiPolygon'], true, false],
       paint: {
-        'line-color': ['match', ['get', '_label'], 'start', '#10B981', 'end', '#EF4444', 'corridor', '#3B82F6', 'no-go', '#DC2626', '#9CA3AF'],
+        'line-color': [
+          'match',
+          ['get', '_label'],
+          'start',
+          '#10B981',
+          'end',
+          '#EF4444',
+          'corridor',
+          '#3B82F6',
+          'no-go',
+          '#DC2626',
+          '#9CA3AF',
+        ],
         'line-width': ['case', ['==', ['get', '_sel'], 1], 3, 2],
         'line-dasharray': [3, 2],
       },
@@ -145,7 +172,19 @@ export default function ImportLabeler() {
       source: 'import-features',
       filter: ['match', ['geometry-type'], ['LineString', 'MultiLineString'], true, false],
       paint: {
-        'line-color': ['match', ['get', '_label'], 'start', '#10B981', 'end', '#EF4444', 'corridor', '#3B82F6', 'no-go', '#DC2626', '#9CA3AF'],
+        'line-color': [
+          'match',
+          ['get', '_label'],
+          'start',
+          '#10B981',
+          'end',
+          '#EF4444',
+          'corridor',
+          '#3B82F6',
+          'no-go',
+          '#DC2626',
+          '#9CA3AF',
+        ],
         'line-width': ['case', ['==', ['get', '_sel'], 1], 4, 2.5],
       },
     });
@@ -169,7 +208,19 @@ export default function ImportLabeler() {
       filter: ['match', ['geometry-type'], ['Point', 'MultiPoint'], true, false],
       paint: {
         'circle-radius': 8,
-        'circle-color': ['match', ['get', '_label'], 'start', '#10B981', 'end', '#EF4444', 'corridor', '#3B82F6', 'no-go', '#DC2626', '#9CA3AF'],
+        'circle-color': [
+          'match',
+          ['get', '_label'],
+          'start',
+          '#10B981',
+          'end',
+          '#EF4444',
+          'corridor',
+          '#3B82F6',
+          'no-go',
+          '#DC2626',
+          '#9CA3AF',
+        ],
         'circle-stroke-width': 2,
         'circle-stroke-color': '#ffffff',
       },
@@ -186,12 +237,19 @@ export default function ImportLabeler() {
           setSelectedId((prev) => (prev === id ? null : id));
         }
       });
-      map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
+      map.on('mouseenter', layerId, () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', layerId, () => {
+        map.getCanvas().style.cursor = '';
+      });
     }
 
     map.on('click', () => {
-      if (suppressNext) { suppressNext = false; return; }
+      if (suppressNext) {
+        suppressNext = false;
+        return;
+      }
       setSelectedId(null);
     });
 
@@ -200,48 +258,60 @@ export default function ImportLabeler() {
   }, []);
 
   const setLabel = (id: string, label: FeatureLabel) => {
-    setItems((prev) => prev.map((item) => item.id === id ? { ...item, label } : item));
+    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, label } : item)));
   };
 
   const startCount = items.filter((i) => i.label === 'start').length;
   const endCount = items.filter((i) => i.label === 'end').length;
   const corridorCount = items.filter((i) => i.label === 'corridor').length;
-  const canSave = startCount === 1 && endCount === 1 && corridorCount === 1 && mapName.trim() !== '';
+  const canSave =
+    startCount === 1 && endCount === 1 && corridorCount === 1 && mapName.trim() !== '';
 
   const handleSave = async () => {
     if (!canSave) return;
     setSaving(true);
     setError('');
     try {
-      const startItem = items.find((i) => i.label === 'start')!;
-      const endItem = items.find((i) => i.label === 'end')!;
-      const corridorItem = items.find((i) => i.label === 'corridor')!;
+      const startItem = items.find((i) => i.label === 'start');
+      const endItem = items.find((i) => i.label === 'end');
+      const corridorItem = items.find((i) => i.label === 'corridor');
       const noGoItems = items.filter((i) => i.label === 'no-go');
+      if (!startItem || !endItem || !corridorItem) {
+        setError('Missing required labels');
+        setSaving(false);
+        return;
+      }
 
       // Resolve start point geometry
       let startGeom: GeoJSON.Geometry = startItem.feature.geometry;
       if (startGeom.type !== 'Point') {
-        const c = startGeom.type === 'Polygon' ? startGeom.coordinates[0][0]
-          : startGeom.type === 'LineString' ? startGeom.coordinates[0]
-          : [0, 0];
+        const c: GeoJSON.Position = (startGeom.type === 'Polygon'
+          ? startGeom.coordinates[0]?.[0]
+          : startGeom.type === 'LineString'
+            ? startGeom.coordinates[0]
+            : undefined) ?? [0, 0];
         startGeom = { type: 'Point', coordinates: c };
       }
 
       // Resolve end point geometry
       let endGeom: GeoJSON.Geometry = endItem.feature.geometry;
       if (endGeom.type !== 'Point') {
-        const c = endGeom.type === 'Polygon'
-          ? endGeom.coordinates[0][Math.floor(endGeom.coordinates[0].length / 2)]
-          : endGeom.type === 'LineString'
-          ? endGeom.coordinates[endGeom.coordinates.length - 1]
-          : [0, 0];
-        endGeom = { type: 'Point', coordinates: c };
+        let c: GeoJSON.Position | undefined;
+        if (endGeom.type === 'Polygon') {
+          const ring = endGeom.coordinates[0];
+          c = ring?.[Math.floor(ring.length / 2)];
+        } else if (endGeom.type === 'LineString') {
+          c = endGeom.coordinates[endGeom.coordinates.length - 1];
+        }
+        endGeom = { type: 'Point', coordinates: c ?? [0, 0] };
       }
 
       // Resolve corridor — buffer lines automatically
       let corridorGeom: GeoJSON.Geometry = corridorItem.feature.geometry;
       if (corridorGeom.type === 'LineString' || corridorGeom.type === 'MultiLineString') {
-        const buffered = buffer(corridorItem.feature as Feature<LineString>, 0.05, { units: 'kilometers' });
+        const buffered = buffer(corridorItem.feature as Feature<LineString>, CORRIDOR_BUFFER_KM, {
+          units: 'kilometers',
+        });
         if (!buffered) throw new Error('Failed to buffer corridor line');
         corridorGeom = buffered.geometry;
       }
@@ -276,7 +346,10 @@ export default function ImportLabeler() {
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
           <p className="text-gray-600 mb-4">No features to label.</p>
-          <button onClick={() => navigate('/guide')} className="text-blue-600 hover:underline text-sm">
+          <button
+            onClick={() => navigate('/guide')}
+            className="text-blue-600 hover:underline text-sm"
+          >
             Back to Dashboard
           </button>
         </div>
@@ -289,7 +362,10 @@ export default function ImportLabeler() {
   return (
     <div className="h-screen flex flex-col">
       <header className="bg-white shadow-sm border-b px-4 py-3 flex items-center gap-4 z-10">
-        <button onClick={() => navigate('/guide')} className="text-gray-500 hover:text-gray-700 shrink-0">
+        <button
+          onClick={() => navigate('/guide')}
+          className="text-gray-500 hover:text-gray-700 shrink-0"
+        >
           &larr; Back
         </button>
         <h1 className="font-bold text-lg truncate">Label Imported Features</h1>
@@ -300,7 +376,9 @@ export default function ImportLabeler() {
         <div className="w-72 bg-white border-r flex flex-col overflow-hidden shrink-0">
           {/* Map name */}
           <div className="p-4 border-b">
-            <label className="block text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">Map Name</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">
+              Map Name
+            </label>
             <input
               type="text"
               value={mapName}
@@ -313,7 +391,8 @@ export default function ImportLabeler() {
           {/* Instructions */}
           <div className="px-4 py-2.5 bg-blue-50 border-b">
             <p className="text-xs text-blue-700 leading-relaxed">
-              Click a feature on the map or in the list below, then assign it a label. You need exactly one Start, End, and Corridor to save.
+              Click a feature on the map or in the list below, then assign it a label. You need
+              exactly one Start, End, and Corridor to save.
             </p>
           </div>
 
@@ -331,9 +410,10 @@ export default function ImportLabeler() {
                       key={opt.value}
                       onClick={() => setLabel(selected.id, active ? null : opt.value)}
                       className="px-2.5 py-1 rounded text-xs font-medium transition-colors"
-                      style={active
-                        ? { backgroundColor: LABEL_COLORS[opt.value], color: '#fff' }
-                        : { backgroundColor: '#F3F4F6', color: '#374151' }
+                      style={
+                        active
+                          ? { backgroundColor: LABEL_COLORS[opt.value], color: '#fff' }
+                          : { backgroundColor: '#F3F4F6', color: '#374151' }
                       }
                     >
                       {opt.label}
@@ -356,10 +436,15 @@ export default function ImportLabeler() {
                   key={item.id}
                   onClick={() => setSelectedId(isSelected ? null : item.id)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left w-full transition-colors ${
-                    isSelected ? 'bg-amber-50 ring-1 ring-amber-300' : 'bg-gray-50 hover:bg-gray-100'
+                    isSelected
+                      ? 'bg-amber-50 ring-1 ring-amber-300'
+                      : 'bg-gray-50 hover:bg-gray-100'
                   }`}
                 >
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: color }}
+                  />
                   <span className="flex-1 truncate text-gray-800 text-xs">{name}</span>
                   <span className="text-gray-400 text-xs shrink-0">{kind}</span>
                   {item.label && (
@@ -384,7 +469,9 @@ export default function ImportLabeler() {
               <span className={endCount === 1 ? 'text-green-600 font-medium' : 'text-gray-400'}>
                 End {endCount}/1
               </span>
-              <span className={corridorCount === 1 ? 'text-green-600 font-medium' : 'text-gray-400'}>
+              <span
+                className={corridorCount === 1 ? 'text-green-600 font-medium' : 'text-gray-400'}
+              >
                 Corridor {corridorCount}/1
               </span>
             </div>

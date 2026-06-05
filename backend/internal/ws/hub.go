@@ -2,7 +2,7 @@ package ws
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"sync"
 
 	"github.com/colinbradley/sluff/internal/model"
@@ -10,12 +10,13 @@ import (
 
 // Hub manages WebSocket connections grouped by session.
 type Hub struct {
-	mu       sync.RWMutex
-	rooms    map[string]map[string]*Client // sessionID -> playerID -> client
-	register chan *Client
+	mu         sync.RWMutex
+	rooms      map[string]map[string]*Client // sessionID -> playerID -> client
+	register   chan *Client
 	unregister chan *Client
 }
 
+// NewHub constructs an empty Hub. Call Run in a goroutine to start dispatching.
 func NewHub() *Hub {
 	return &Hub{
 		rooms:      make(map[string]map[string]*Client),
@@ -24,6 +25,8 @@ func NewHub() *Hub {
 	}
 }
 
+// Run processes register and unregister events until the program exits.
+// It is intended to be called once in a dedicated goroutine.
 func (h *Hub) Run() {
 	for {
 		select {
@@ -34,12 +37,16 @@ func (h *Hub) Run() {
 			}
 			h.rooms[client.SessionID][client.PlayerID] = client
 			h.mu.Unlock()
-			log.Printf("Player %s joined session %s", client.PlayerID, client.SessionID)
+			slog.Info("player joined", "player_id", client.PlayerID, "session_id", client.SessionID)
 
 		case client := <-h.unregister:
 			h.mu.Lock()
 			if room, ok := h.rooms[client.SessionID]; ok {
-				if _, ok := room[client.PlayerID]; ok {
+				// Only evict if this *Client is still the registered one for
+				// the player. If the player reconnected, a newer *Client
+				// occupies the slot and must not be removed when an older
+				// goroutine's defer fires this Unregister.
+				if existing, ok := room[client.PlayerID]; ok && existing == client {
 					delete(room, client.PlayerID)
 					close(client.send)
 					if len(room) == 0 {
@@ -48,15 +55,17 @@ func (h *Hub) Run() {
 				}
 			}
 			h.mu.Unlock()
-			log.Printf("Player %s left session %s", client.PlayerID, client.SessionID)
+			slog.Info("player left", "player_id", client.PlayerID, "session_id", client.SessionID)
 		}
 	}
 }
 
+// Register enqueues a client for registration. Safe for concurrent use.
 func (h *Hub) Register(c *Client) {
 	h.register <- c
 }
 
+// Unregister enqueues a client for removal. Safe for concurrent use.
 func (h *Hub) Unregister(c *Client) {
 	h.unregister <- c
 }

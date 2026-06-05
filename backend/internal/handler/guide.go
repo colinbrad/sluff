@@ -2,7 +2,7 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
 	"time"
 
@@ -21,14 +21,17 @@ func guideIDFromCtx(r *http.Request) string {
 	return middleware.GuideIDFromContext(r.Context())
 }
 
+// GuideHandler implements the authenticated map and round CRUD endpoints.
 type GuideHandler struct {
 	store store.Store
 }
 
+// NewGuideHandler constructs a GuideHandler backed by the given store.
 func NewGuideHandler(s store.Store) *GuideHandler {
 	return &GuideHandler{store: s}
 }
 
+// CreateMap creates a new map owned by the authenticated guide.
 func (h *GuideHandler) CreateMap(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name        string `json:"name"`
@@ -61,6 +64,7 @@ func (h *GuideHandler) CreateMap(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, m)
 }
 
+// ListMaps returns the maps owned by the authenticated guide.
 func (h *GuideHandler) ListMaps(w http.ResponseWriter, r *http.Request) {
 	guideID := guideIDFromCtx(r)
 	maps, err := h.store.ListMapsByGuide(guideID)
@@ -74,6 +78,8 @@ func (h *GuideHandler) ListMaps(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, maps)
 }
 
+// GetMap returns the requested map (rounds included) if it is owned by the
+// authenticated guide.
 func (h *GuideHandler) GetMap(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "mapID")
 	m, err := h.store.GetMap(id)
@@ -85,14 +91,18 @@ func (h *GuideHandler) GetMap(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "map not found")
 		return
 	}
+	if m.GuideID != guideIDFromCtx(r) {
+		writeError(w, http.StatusForbidden, "not your map")
+		return
+	}
 
 	// Convert orb geometries to GeoJSON format for frontend compatibility
-	roundsJSON := make([]interface{}, len(m.Rounds))
+	roundsJSON := make([]any, len(m.Rounds))
 	for i, round := range m.Rounds {
 		roundsJSON[i] = roundToGeoJSON(&round)
 	}
 
-	mapJSON := map[string]interface{}{
+	mapJSON := map[string]any{
 		"id":          m.ID,
 		"name":        m.Name,
 		"description": m.Description,
@@ -104,6 +114,7 @@ func (h *GuideHandler) GetMap(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, mapJSON)
 }
 
+// UpdateMap renames or re-describes a map owned by the authenticated guide.
 func (h *GuideHandler) UpdateMap(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "mapID")
 
@@ -121,6 +132,10 @@ func (h *GuideHandler) UpdateMap(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "map not found")
 		return
 	}
+	if m.GuideID != guideIDFromCtx(r) {
+		writeError(w, http.StatusForbidden, "not your map")
+		return
+	}
 
 	if req.Name != "" {
 		m.Name = req.Name
@@ -135,8 +150,22 @@ func (h *GuideHandler) UpdateMap(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, m)
 }
 
+// DeleteMap deletes a map (and its rounds, via cascade) owned by the guide.
 func (h *GuideHandler) DeleteMap(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "mapID")
+	m, err := h.store.GetMap(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get map")
+		return
+	}
+	if m == nil {
+		writeError(w, http.StatusNotFound, "map not found")
+		return
+	}
+	if m.GuideID != guideIDFromCtx(r) {
+		writeError(w, http.StatusForbidden, "not your map")
+		return
+	}
 	if err := h.store.DeleteMap(id); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to delete map")
 		return
@@ -153,12 +182,17 @@ type createRoundRequest struct {
 	NoGoZones   json.RawMessage `json:"no_go_zones"`
 }
 
+// CreateRound adds a new round to a map owned by the authenticated guide.
 func (h *GuideHandler) CreateRound(w http.ResponseWriter, r *http.Request) {
 	mapID := chi.URLParam(r, "mapID")
 
 	m, err := h.store.GetMap(mapID)
 	if err != nil || m == nil {
 		writeError(w, http.StatusNotFound, "map not found")
+		return
+	}
+	if m.GuideID != guideIDFromCtx(r) {
+		writeError(w, http.StatusForbidden, "not your map")
 		return
 	}
 
@@ -217,12 +251,23 @@ func (h *GuideHandler) CreateRound(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, roundToGeoJSON(round))
 }
 
+// UpdateRound modifies an existing round; only fields present in the request
+// body are changed.
 func (h *GuideHandler) UpdateRound(w http.ResponseWriter, r *http.Request) {
 	roundID := chi.URLParam(r, "roundID")
 
 	existing, err := h.store.GetRound(roundID)
 	if err != nil || existing == nil {
 		writeError(w, http.StatusNotFound, "round not found")
+		return
+	}
+	parentMap, err := h.store.GetMap(existing.MapID)
+	if err != nil || parentMap == nil {
+		writeError(w, http.StatusInternalServerError, "failed to get map")
+		return
+	}
+	if parentMap.GuideID != guideIDFromCtx(r) {
+		writeError(w, http.StatusForbidden, "not your map")
 		return
 	}
 
@@ -293,8 +338,27 @@ func (h *GuideHandler) UpdateRound(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, roundToGeoJSON(existing))
 }
 
+// DeleteRound removes a round from a map owned by the authenticated guide.
 func (h *GuideHandler) DeleteRound(w http.ResponseWriter, r *http.Request) {
 	roundID := chi.URLParam(r, "roundID")
+	existing, err := h.store.GetRound(roundID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get round")
+		return
+	}
+	if existing == nil {
+		writeError(w, http.StatusNotFound, "round not found")
+		return
+	}
+	parentMap, err := h.store.GetMap(existing.MapID)
+	if err != nil || parentMap == nil {
+		writeError(w, http.StatusInternalServerError, "failed to get map")
+		return
+	}
+	if parentMap.GuideID != guideIDFromCtx(r) {
+		writeError(w, http.StatusForbidden, "not your map")
+		return
+	}
 	if err := h.store.DeleteRound(roundID); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to delete round")
 		return
@@ -341,7 +405,7 @@ func parsePoint(raw json.RawMessage) (orb.Point, error) {
 	}
 	p, ok := geom.Geometry().(orb.Point)
 	if !ok {
-		return orb.Point{}, fmt.Errorf("expected Point geometry")
+		return orb.Point{}, errors.New("expected Point geometry")
 	}
 	return p, nil
 }
@@ -353,7 +417,7 @@ func parsePolygon(raw json.RawMessage) (orb.Polygon, error) {
 	}
 	p, ok := geom.Geometry().(orb.Polygon)
 	if !ok {
-		return nil, fmt.Errorf("expected Polygon geometry")
+		return nil, errors.New("expected Polygon geometry")
 	}
 	return p, nil
 }

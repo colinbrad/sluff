@@ -1,16 +1,18 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
-import {
-  TerraDraw,
-  TerraDrawLineStringMode,
-  TerraDrawSelectMode,
-} from 'terra-draw';
+import { TerraDraw, TerraDrawLineStringMode, TerraDrawSelectMode } from 'terra-draw';
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import type { Round } from '../../types/game';
-import type { GameStatePayload, CursorUpdatePayload, DrawingUpdateFromServer, ScoresPayload } from '../../types/messages';
+import type {
+  GameStatePayload,
+  CursorUpdatePayload,
+  DrawingUpdateFromServer,
+  ScoresPayload,
+} from '../../types/messages';
 import * as api from '../../services/api';
 import { addRoundMarkers, addNoGoZoneLayers, removeNoGoZoneLayers } from '../../utils/mapUtils';
+import { toCoord } from '../../utils/geojson';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useGameStore } from '../../stores/gameStore';
 import { useGuideStore } from '../../stores/guideStore';
@@ -63,7 +65,9 @@ export default function GameView() {
 
   const mapRef = useRef<maplibregl.Map | null>(null);
   const currentRoundRef = useRef<typeof currentRound>(currentRound);
-  useEffect(() => { currentRoundRef.current = currentRound; }, [currentRound]);
+  useEffect(() => {
+    currentRoundRef.current = currentRound;
+  }, [currentRound]);
   const drawRef = useRef<TerraDraw | null>(null);
   const wsRef = useRef<GameWebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -212,8 +216,8 @@ export default function GameView() {
 
     if (currentRound.start_point?.coordinates && currentRound.end_point?.coordinates) {
       const bounds = new maplibregl.LngLatBounds();
-      bounds.extend(currentRound.start_point.coordinates as [number, number]);
-      bounds.extend(currentRound.end_point.coordinates as [number, number]);
+      bounds.extend(toCoord(currentRound.start_point.coordinates));
+      bounds.extend(toCoord(currentRound.end_point.coordinates));
       map.fitBounds(bounds, { padding: 120, maxZoom: 16, animate: false });
     }
   }, [currentRound, mapReady]);
@@ -244,8 +248,8 @@ export default function GameView() {
       const cr = currentRoundRef.current;
       if (cr?.start_point?.coordinates && cr?.end_point?.coordinates) {
         const bounds = new maplibregl.LngLatBounds();
-        bounds.extend(cr.start_point.coordinates as [number, number]);
-        bounds.extend(cr.end_point.coordinates as [number, number]);
+        bounds.extend(toCoord(cr.start_point.coordinates));
+        bounds.extend(toCoord(cr.end_point.coordinates));
         map.fitBounds(bounds, { padding: 120, maxZoom: 16, animate: false });
       }
 
@@ -287,8 +291,8 @@ export default function GameView() {
         draw.on('change', () => {
           const snapshot = draw.getSnapshot();
           const lineFeatures = snapshot.filter((f) => f.geometry.type === 'LineString');
-          if (lineFeatures.length > 0) {
-            const latest = lineFeatures[lineFeatures.length - 1];
+          const latest = lineFeatures[lineFeatures.length - 1];
+          if (latest) {
             wsRef.current?.send('drawing_update', {
               team_id: player?.team_id || '',
               path: latest.geometry,
@@ -297,7 +301,7 @@ export default function GameView() {
         });
       }
     },
-    [player, isSolo, isDemo]
+    [player, isSolo, isDemo],
   );
 
   const handleSubmit = async () => {
@@ -308,9 +312,8 @@ export default function GameView() {
 
     const snapshot = draw.getSnapshot();
     const lineFeatures = snapshot.filter((f) => f.geometry.type === 'LineString');
-    if (lineFeatures.length === 0) return;
-
     const latestLine = lineFeatures[lineFeatures.length - 1];
+    if (!latestLine) return;
 
     setSubmitting(true);
     try {
@@ -318,21 +321,21 @@ export default function GameView() {
         sessionId,
         currentRound.id,
         player.team_id,
-        latestLine.geometry as GeoJSON.Geometry
+        latestLine.geometry as GeoJSON.Geometry,
       );
       setSubmitted(true);
 
       if (isSolo) {
         const scores = await api.getScores(sessionId, currentRound.id);
         setRouteResults(scores);
-        const mappedScores = scores.map((r) => ({
-          team_id: r.team_id,
-          score: r.details!,
-        }));
+        const mappedScores = scores.flatMap((r) =>
+          r.details ? [{ team_id: r.team_id, score: r.details }] : [],
+        );
         setTeamScores(mappedScores);
         setShowScores(true);
       }
     } catch {
+      // Submission failed; UI shows the unsubmitted state, user can retry.
     } finally {
       setSubmitting(false);
     }

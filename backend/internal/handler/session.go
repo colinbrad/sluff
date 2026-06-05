@@ -15,14 +15,17 @@ import (
 	"github.com/colinbradley/sluff/internal/store"
 )
 
+// SessionHandler implements session and team management endpoints.
 type SessionHandler struct {
 	store store.Store
 }
 
+// NewSessionHandler constructs a SessionHandler backed by the given store.
 func NewSessionHandler(s store.Store) *SessionHandler {
 	return &SessionHandler{store: s}
 }
 
+// CreateSession creates a multiplayer session for an authenticated guide's map.
 func (h *SessionHandler) CreateSession(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		MapID        string `json:"map_id"`
@@ -68,6 +71,7 @@ func (h *SessionHandler) CreateSession(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, sess)
 }
 
+// GetSession returns a session by ID.
 func (h *SessionHandler) GetSession(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "sessionID")
 	sess, err := h.store.GetSession(id)
@@ -82,6 +86,7 @@ func (h *SessionHandler) GetSession(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, sess)
 }
 
+// GetSessionByCode returns a session by its short join code.
 func (h *SessionHandler) GetSessionByCode(w http.ResponseWriter, r *http.Request) {
 	code := chi.URLParam(r, "code")
 	sess, err := h.store.GetSessionByCode(code)
@@ -96,6 +101,7 @@ func (h *SessionHandler) GetSessionByCode(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, sess)
 }
 
+// JoinSession registers a new player in a waiting session.
 func (h *SessionHandler) JoinSession(w http.ResponseWriter, r *http.Request) {
 	sessionID := chi.URLParam(r, "sessionID")
 
@@ -147,6 +153,7 @@ func (h *SessionHandler) JoinSession(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, player)
 }
 
+// CreateTeam creates a new team within a session, up to a maximum of four.
 func (h *SessionHandler) CreateTeam(w http.ResponseWriter, r *http.Request) {
 	sessionID := chi.URLParam(r, "sessionID")
 
@@ -197,6 +204,7 @@ func (h *SessionHandler) CreateTeam(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, team)
 }
 
+// JoinTeam assigns an existing player to a team.
 func (h *SessionHandler) JoinTeam(w http.ResponseWriter, r *http.Request) {
 	teamID := chi.URLParam(r, "teamID")
 
@@ -220,6 +228,8 @@ func (h *SessionHandler) JoinTeam(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "joined"})
 }
 
+// CreateSoloSession creates a single-player session with one team and one player
+// pre-created for the requesting guide.
 func (h *SessionHandler) CreateSoloSession(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		MapID        string `json:"map_id"`
@@ -284,13 +294,15 @@ func (h *SessionHandler) CreateSoloSession(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, map[string]interface{}{
+	writeJSON(w, http.StatusCreated, map[string]any{
 		"session": sess,
 		"player":  player,
 		"team":    team,
 	})
 }
 
+// CreateDemoSession creates an unauthenticated single-player session against
+// the first available map, used by the public demo flow.
 func (h *SessionHandler) CreateDemoSession(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		PlayerName string `json:"player_name"`
@@ -354,7 +366,7 @@ func (h *SessionHandler) CreateDemoSession(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, map[string]interface{}{
+	writeJSON(w, http.StatusCreated, map[string]any{
 		"session": sess,
 		"player":  player,
 		"team":    team,

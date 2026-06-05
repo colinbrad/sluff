@@ -11,11 +11,15 @@ import (
 	"github.com/colinbradley/sluff/internal/ws"
 )
 
+// GuideAdminHandler implements guide-only moderation endpoints: kick player,
+// clear a team's submitted route.
 type GuideAdminHandler struct {
 	store store.Store
 	hub   *ws.Hub
 }
 
+// NewGuideAdminHandler constructs a GuideAdminHandler backed by the given
+// store and hub.
 func NewGuideAdminHandler(s store.Store, hub *ws.Hub) *GuideAdminHandler {
 	return &GuideAdminHandler{store: s, hub: hub}
 }
@@ -43,7 +47,7 @@ func (h *GuideAdminHandler) KickPlayer(w http.ResponseWriter, r *http.Request) {
 
 	h.hub.BroadcastToSession(sessionID, model.WSMessage{
 		Type:    "player_left",
-		Payload: mustMarshal(map[string]string{"player_id": playerID}),
+		Payload: safeMarshal(map[string]string{"player_id": playerID}),
 	})
 
 	w.WriteHeader(http.StatusNoContent)

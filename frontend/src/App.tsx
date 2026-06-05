@@ -26,12 +26,47 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/guide/login" element={<GuideLogin />} />
-          <Route path="/guide" element={<GuideRoute><GuideDashboard /></GuideRoute>} />
-          <Route path="/guide/maps/:mapId" element={<GuideRoute><MapEditor /></GuideRoute>} />
-          <Route path="/guide/import" element={<GuideRoute><ImportLabeler /></GuideRoute>} />
+          <Route
+            path="/guide"
+            element={
+              <GuideRoute>
+                <GuideDashboard />
+              </GuideRoute>
+            }
+          />
+          <Route
+            path="/guide/maps/:mapId"
+            element={
+              <GuideRoute>
+                <MapEditor />
+              </GuideRoute>
+            }
+          />
+          <Route
+            path="/guide/import"
+            element={
+              <GuideRoute>
+                <ImportLabeler />
+              </GuideRoute>
+            }
+          />
           <Route path="/demo" element={<DemoSetup />} />
-          <Route path="/solo" element={<GuideRoute><SoloSetup /></GuideRoute>} />
-          <Route path="/create" element={<GuideRoute><CreateSession /></GuideRoute>} />
+          <Route
+            path="/solo"
+            element={
+              <GuideRoute>
+                <SoloSetup />
+              </GuideRoute>
+            }
+          />
+          <Route
+            path="/create"
+            element={
+              <GuideRoute>
+                <CreateSession />
+              </GuideRoute>
+            }
+          />
           <Route path="/join" element={<JoinSession />} />
           <Route path="/session/:sessionId/lobby" element={<WaitingRoom />} />
           <Route path="/session/:sessionId/play" element={<GameView />} />

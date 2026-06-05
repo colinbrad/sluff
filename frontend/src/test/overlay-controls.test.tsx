@@ -10,7 +10,7 @@ describe('MapOverlayControls', () => {
         slopeShading={false}
         onToggleTerrain={() => {}}
         onToggleSlope={() => {}}
-      />
+      />,
     );
 
     expect(screen.getByText('3D')).toBeInTheDocument();
@@ -25,7 +25,7 @@ describe('MapOverlayControls', () => {
         slopeShading={false}
         onToggleTerrain={onToggle}
         onToggleSlope={() => {}}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByText('3D'));
@@ -40,7 +40,7 @@ describe('MapOverlayControls', () => {
         slopeShading={false}
         onToggleTerrain={() => {}}
         onToggleSlope={onToggle}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByText('Slope'));
@@ -54,7 +54,7 @@ describe('MapOverlayControls', () => {
         slopeShading={false}
         onToggleTerrain={() => {}}
         onToggleSlope={() => {}}
-      />
+      />,
     );
 
     const btn = screen.getByTitle('Toggle 3D terrain');
@@ -69,7 +69,7 @@ describe('MapOverlayControls', () => {
         slopeShading={false}
         onToggleTerrain={() => {}}
         onToggleSlope={() => {}}
-      />
+      />,
     );
 
     const btn = screen.getByTitle('Toggle 3D terrain');
@@ -84,7 +84,7 @@ describe('MapOverlayControls', () => {
         slopeShading={true}
         onToggleTerrain={() => {}}
         onToggleSlope={() => {}}
-      />
+      />,
     );
 
     const btn = screen.getByTitle('Toggle slope angle shading');
@@ -99,7 +99,7 @@ describe('MapOverlayControls', () => {
         slopeShading={false}
         onToggleTerrain={() => {}}
         onToggleSlope={() => {}}
-      />
+      />,
     );
 
     const btn = screen.getByTitle('Toggle slope angle shading');
@@ -114,7 +114,7 @@ describe('MapOverlayControls', () => {
         slopeShading={true}
         onToggleTerrain={() => {}}
         onToggleSlope={() => {}}
-      />
+      />,
     );
 
     expect(screen.getByTitle('Toggle 3D terrain').className).toContain('bg-blue-600');

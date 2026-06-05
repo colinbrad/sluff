@@ -16,7 +16,11 @@ export default function GuideDashboard() {
   const { guide, clearAuth } = useGuideStore();
 
   useEffect(() => {
-    api.listMaps().then(setMaps).catch(() => {}).finally(() => setLoading(false));
+    api
+      .listMaps()
+      .then(setMaps)
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   const handleCreate = async () => {
@@ -43,8 +47,14 @@ export default function GuideDashboard() {
       const fc = await parseFile(file);
       const usable = fc.features.filter((f) => {
         const t = f.geometry?.type;
-        return t === 'Point' || t === 'Polygon' || t === 'LineString'
-          || t === 'MultiPoint' || t === 'MultiPolygon' || t === 'MultiLineString';
+        return (
+          t === 'Point' ||
+          t === 'Polygon' ||
+          t === 'LineString' ||
+          t === 'MultiPoint' ||
+          t === 'MultiPolygon' ||
+          t === 'MultiLineString'
+        );
       });
 
       if (usable.length === 0) {
@@ -87,7 +97,10 @@ export default function GuideDashboard() {
               Home
             </button>
             <button
-              onClick={() => { clearAuth(); navigate('/'); }}
+              onClick={() => {
+                clearAuth();
+                navigate('/');
+              }}
               className="text-sm text-red-500 hover:text-red-700 py-1"
             >
               Sign Out
@@ -133,9 +146,7 @@ export default function GuideDashboard() {
             >
               {importing ? 'Importing...' : 'Import KML / GPX / GeoJSON'}
             </button>
-            {importError && (
-              <p className="mt-2 text-sm text-red-600">{importError}</p>
-            )}
+            {importError && <p className="mt-2 text-sm text-red-600">{importError}</p>}
           </div>
         </div>
 

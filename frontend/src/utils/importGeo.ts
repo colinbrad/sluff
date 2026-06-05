@@ -1,7 +1,16 @@
 import buffer from '@turf/buffer';
 // @ts-expect-error no type declarations available
 import * as toGeoJSON from '@mapbox/togeojson';
-import type { Feature, FeatureCollection, LineString, MultiLineString, Point, Polygon } from 'geojson';
+import type {
+  Feature,
+  FeatureCollection,
+  LineString,
+  MultiLineString,
+  Point,
+  Polygon,
+} from 'geojson';
+import { CORRIDOR_BUFFER_KM } from '../constants';
+import { toCoord } from './geojson';
 
 export interface ImportedRound {
   name: string;
@@ -16,7 +25,7 @@ export function parseFile(file: File): Promise<FeatureCollection> {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const text = reader.result as string;
+        const text = String(reader.result ?? '');
         const ext = file.name.split('.').pop()?.toLowerCase();
 
         if (ext === 'geojson' || ext === 'json') {
@@ -28,7 +37,10 @@ export function parseFile(file: File): Promise<FeatureCollection> {
             resolve({ type: 'FeatureCollection', features: [parsed] });
           } else {
             // Bare geometry
-            resolve({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: parsed }] });
+            resolve({
+              type: 'FeatureCollection',
+              features: [{ type: 'Feature', properties: {}, geometry: parsed }],
+            });
           }
         } else if (ext === 'kml') {
           const dom = new DOMParser().parseFromString(text, 'application/xml');
@@ -50,22 +62,34 @@ export function parseFile(file: File): Promise<FeatureCollection> {
 
 /** Convert a LineString to start point, end point, and buffered corridor polygon */
 function lineToRound(coords: number[][], name: string): ImportedRound {
-  const start = coords[0];
-  const end = coords[coords.length - 1];
+  const start = toCoord(coords[0]);
+  const end = toCoord(coords[coords.length - 1]);
   const line: Feature<LineString> = {
     type: 'Feature',
     properties: {},
     geometry: { type: 'LineString', coordinates: coords },
   };
-  const buffered = buffer(line, 0.05, { units: 'kilometers' });
+  const buffered = buffer(line, CORRIDOR_BUFFER_KM, { units: 'kilometers' });
   if (!buffered) {
     throw new Error(`Failed to buffer line "${name}"`);
   }
+  // @turf/buffer can return Polygon or MultiPolygon (e.g. self-crossing lines);
+  // take the first polygon of a MultiPolygon to avoid aborting the import.
+  let corridor: Polygon;
+  if (buffered.geometry.type === 'Polygon') {
+    corridor = buffered.geometry;
+  } else if (buffered.geometry.type === 'MultiPolygon') {
+    const firstRing = buffered.geometry.coordinates[0];
+    if (!firstRing) throw new Error(`Buffer produced empty MultiPolygon for "${name}"`);
+    corridor = { type: 'Polygon', coordinates: firstRing };
+  } else {
+    throw new Error(`Buffer returned unexpected geometry for "${name}"`);
+  }
   return {
     name,
-    start_point: { type: 'Point', coordinates: [start[0], start[1]] },
-    end_point: { type: 'Point', coordinates: [end[0], end[1]] },
-    corridor: buffered.geometry as Polygon,
+    start_point: { type: 'Point', coordinates: start },
+    end_point: { type: 'Point', coordinates: end },
+    corridor,
   };
 }
 
@@ -84,22 +108,24 @@ export function extractRounds(fc: FeatureCollection): ImportedRound[] {
         idx++;
       }
     } else if (geom.type === 'MultiLineString') {
-      for (const line of (geom as MultiLineString).coordinates) {
+      const multi: MultiLineString = geom;
+      for (const line of multi.coordinates) {
         if (line.length >= 2) {
           rounds.push(lineToRound(line, `${name} (${idx})`));
           idx++;
         }
       }
     } else if (geom.type === 'Polygon') {
-      // Use polygon as corridor, derive start/end from first and midpoint vertices
-      const ring = (geom as Polygon).coordinates[0];
-      if (ring.length >= 4) {
+      // Use polygon as corridor, derive start/end from first and midpoint vertices.
+      const polygon: Polygon = geom;
+      const ring = polygon.coordinates[0];
+      if (ring && ring.length >= 4) {
         const mid = Math.floor(ring.length / 2);
         rounds.push({
           name,
-          start_point: { type: 'Point', coordinates: [ring[0][0], ring[0][1]] },
-          end_point: { type: 'Point', coordinates: [ring[mid][0], ring[mid][1]] },
-          corridor: geom as Polygon,
+          start_point: { type: 'Point', coordinates: toCoord(ring[0]) },
+          end_point: { type: 'Point', coordinates: toCoord(ring[mid]) },
+          corridor: polygon,
         });
         idx++;
       }

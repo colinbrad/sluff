@@ -13,15 +13,19 @@ import (
 	"github.com/colinbradley/sluff/internal/store"
 )
 
+// AuthHandler implements guide registration and login endpoints and issues JWTs.
 type AuthHandler struct {
 	store     store.Store
 	jwtSecret string
 }
 
+// NewAuthHandler constructs an AuthHandler that signs tokens with jwtSecret.
 func NewAuthHandler(s store.Store, jwtSecret string) *AuthHandler {
 	return &AuthHandler{store: s, jwtSecret: jwtSecret}
 }
 
+// Register creates a new guide account from a username and password, returning
+// a JWT on success.
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username string `json:"username"`
@@ -79,6 +83,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Login verifies a guide's credentials and returns a JWT on success.
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username string `json:"username"`

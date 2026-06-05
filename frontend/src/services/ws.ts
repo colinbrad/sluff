@@ -1,4 +1,5 @@
 import type { WSMessage } from '../types/messages';
+import { RECONNECT_INITIAL_DELAY_MS, RECONNECT_MAX_DELAY_MS } from '../constants';
 
 type MessageHandler = (msg: WSMessage) => void;
 
@@ -6,7 +7,7 @@ export class GameWebSocket {
   private ws: WebSocket | null = null;
   private handlers: Set<MessageHandler> = new Set();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private reconnectDelay = 1000;
+  private reconnectDelay = RECONNECT_INITIAL_DELAY_MS;
   private sessionId: string;
   private playerId: string;
   private closed = false;
@@ -32,7 +33,7 @@ export class GameWebSocket {
     this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
-      this.reconnectDelay = 1000;
+      this.reconnectDelay = RECONNECT_INITIAL_DELAY_MS;
     };
 
     this.ws.onmessage = (event) => {
@@ -59,7 +60,7 @@ export class GameWebSocket {
     if (this.reconnectTimer) return;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000);
+      this.reconnectDelay = Math.min(this.reconnectDelay * 2, RECONNECT_MAX_DELAY_MS);
       this.connect();
     }, this.reconnectDelay);
   }
