@@ -3,9 +3,6 @@ FROM golang:1.25-bookworm AS builder
 
 WORKDIR /app
 
-# Install gcc for CGo (SQLite)
-RUN apt-get update && apt-get install -y gcc musl-dev && rm -rf /var/lib/apt/lists/*
-
 # Cache Go module downloads
 COPY backend/go.mod backend/go.sum ./backend/
 RUN cd backend && go mod download
@@ -13,8 +10,8 @@ RUN cd backend && go mod download
 # Copy backend source
 COPY backend/ ./backend/
 
-# Build statically-linked binary with CGo enabled for SQLite
-RUN cd backend && CGO_ENABLED=1 go build -o /sluff-server ./cmd/sluff-server
+# Pure-Go SQLite (modernc.org/sqlite) — no CGo, no C toolchain.
+RUN cd backend && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /sluff-server ./cmd/sluff-server
 
 # Stage 2: Runtime
 FROM debian:bookworm-slim AS runtime
@@ -24,8 +21,9 @@ WORKDIR /app
 # Install ca-certificates, curl, and Litestream
 RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
 
-# Install Litestream
-RUN curl -fsSL https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-amd64.deb -o /tmp/litestream.deb && \
+# Install Litestream — arch detected at build time so the same Dockerfile works on amd64 and arm64.
+RUN ARCH=$(dpkg --print-architecture) && \
+    curl -fsSL "https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-${ARCH}.deb" -o /tmp/litestream.deb && \
     dpkg -i /tmp/litestream.deb && \
     rm /tmp/litestream.deb
 

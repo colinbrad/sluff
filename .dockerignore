@@ -1,0 +1,17 @@
+.git
+.gitignore
+.github
+*.md
+.vscode
+.idea
+
+# Frontend is built separately — not needed in backend image
+frontend/
+dist/
+
+# Local dev
+Makefile
+
+# Go build/test artifacts
+backend/**/*.test
+backend/**/*.out
