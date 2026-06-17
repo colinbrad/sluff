@@ -14,12 +14,12 @@ import (
 // WSHandler implements the WebSocket upgrade endpoint, validating the player
 // against the session and starting the read and write goroutines.
 type WSHandler struct {
-	store store.Store
+	store *store.SQLiteStore
 	hub   *ws.Hub
 }
 
 // NewWSHandler constructs a WSHandler backed by the given store and hub.
-func NewWSHandler(s store.Store, hub *ws.Hub) *WSHandler {
+func NewWSHandler(s *store.SQLiteStore, hub *ws.Hub) *WSHandler {
 	return &WSHandler{store: s, hub: hub}
 }
 

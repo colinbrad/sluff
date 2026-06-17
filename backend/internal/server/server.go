@@ -23,7 +23,7 @@ import (
 // Server is the HTTP application: chi router, middleware stack, hub, and store.
 type Server struct {
 	router      *chi.Mux
-	store       store.Store
+	store       *store.SQLiteStore
 	hub         *ws.Hub
 	cfg         *config.Config
 	authLimiter *middleware.RateLimiter
@@ -32,7 +32,7 @@ type Server struct {
 // New constructs a Server, starts the WebSocket hub, and registers all routes.
 // The rate limiter's cleanup goroutine is tied to ctx so it stops when the
 // caller cancels.
-func New(ctx context.Context, s store.Store, cfg *config.Config) *Server {
+func New(ctx context.Context, s *store.SQLiteStore, cfg *config.Config) *Server {
 	srv := &Server{
 		router:      chi.NewRouter(),
 		store:       s,
@@ -85,12 +85,8 @@ func (s *Server) setupRoutes() {
 	})
 
 	// Auth endpoints (public, rate limited)
-	s.router.Post("/api/auth/register", func(w http.ResponseWriter, r *http.Request) {
-		s.authLimiter.Limit(http.HandlerFunc(authH.Register)).ServeHTTP(w, r)
-	})
-	s.router.Post("/api/auth/login", func(w http.ResponseWriter, r *http.Request) {
-		s.authLimiter.Limit(http.HandlerFunc(authH.Login)).ServeHTTP(w, r)
-	})
+	s.router.With(s.authLimiter.Limit).Post("/api/auth/register", authH.Register)
+	s.router.With(s.authLimiter.Limit).Post("/api/auth/login", authH.Login)
 
 	// Guide map management (requires auth)
 	s.router.Route("/api/guide/maps", func(r chi.Router) {

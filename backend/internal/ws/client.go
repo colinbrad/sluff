@@ -113,10 +113,9 @@ func (c *Client) handleMessage(msg model.WSMessage) {
 		if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 			return
 		}
-		// Broadcast cursor to teammates
 		c.hub.BroadcastToTeam(c.SessionID, c.TeamID, model.WSMessage{
 			Type: model.MsgCursorUpdate,
-			Payload: safeMarshal(model.CursorUpdatePayload{
+			Payload: model.MustMarshal(model.CursorUpdatePayload{
 				PlayerID: c.PlayerID,
 				Lat:      payload.Lat,
 				Lng:      payload.Lng,
@@ -130,16 +129,12 @@ func (c *Client) handleMessage(msg model.WSMessage) {
 		}
 		payload.PlayerID = c.PlayerID
 		payload.TeamID = c.TeamID
-		// Broadcast drawing to teammates
 		c.hub.BroadcastToTeam(c.SessionID, c.TeamID, model.WSMessage{
 			Type:    model.MsgDrawingUpdate,
-			Payload: safeMarshal(payload),
+			Payload: model.MustMarshal(payload),
 		}, c.PlayerID)
 
 	case model.MsgPing:
 		// No-op, connection activity is enough
 	}
 }
-
-// safeMarshal is an alias for model.SafeMarshal kept for call-site brevity.
-func safeMarshal(v any) json.RawMessage { return model.SafeMarshal(v) }

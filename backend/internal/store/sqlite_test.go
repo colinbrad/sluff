@@ -14,7 +14,7 @@ import (
 // newTestStore opens a real, file-backed SQLite database in a temporary
 // directory so tests exercise the full persistence path (WAL, foreign keys,
 // migrations) rather than an in-memory shortcut.
-func newTestStore(t *testing.T) store.Store {
+func newTestStore(t *testing.T) *store.SQLiteStore {
 	t.Helper()
 	dbPath := filepath.Join(t.TempDir(), "test.db")
 	s, err := store.NewSQLiteStore(dbPath)

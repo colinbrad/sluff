@@ -74,7 +74,6 @@ CREATE INDEX IF NOT EXISTS idx_team_routes_round_id ON team_routes(round_id);
 // alterMigrations run after schema creation to add columns to existing tables.
 // Errors from "duplicate column name" are expected and ignored.
 var alterMigrations = []string{
-	"ALTER TABLE sessions ADD COLUMN is_solo INTEGER NOT NULL DEFAULT 0",
 	"ALTER TABLE rounds ADD COLUMN no_go_zones TEXT NOT NULL DEFAULT '[]'",
 	"ALTER TABLE game_maps ADD COLUMN guide_id TEXT REFERENCES guides(id)",
 	"ALTER TABLE sessions ADD COLUMN guide_id TEXT REFERENCES guides(id)",

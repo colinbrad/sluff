@@ -24,7 +24,7 @@ import (
 
 // testEnv bundles the dependencies every test needs.
 type testEnv struct {
-	store  store.Store
+	store  *store.SQLiteStore
 	hub    *ws.Hub
 	guideH *handler.GuideHandler
 	sessH  *handler.SessionHandler
@@ -170,7 +170,7 @@ const routeLineJSON = `{"type":"LineString","coordinates":[[-111.58,40.59],[-111
 
 // buildRouterForGuide creates a minimal chi router that injects a specific
 // guide ID for the guide-map endpoints, used by IDOR tests.
-func buildRouterForGuide(s store.Store, guideID string) *chi.Mux {
+func buildRouterForGuide(s *store.SQLiteStore, guideID string) *chi.Mux {
 	guideH := handler.NewGuideHandler(s)
 	inject := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

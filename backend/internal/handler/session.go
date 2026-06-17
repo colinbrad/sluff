@@ -17,11 +17,11 @@ import (
 
 // SessionHandler implements session and team management endpoints.
 type SessionHandler struct {
-	store store.Store
+	store *store.SQLiteStore
 }
 
 // NewSessionHandler constructs a SessionHandler backed by the given store.
-func NewSessionHandler(s store.Store) *SessionHandler {
+func NewSessionHandler(s *store.SQLiteStore) *SessionHandler {
 	return &SessionHandler{store: s}
 }
 
@@ -256,49 +256,13 @@ func (h *SessionHandler) CreateSoloSession(w http.ResponseWriter, r *http.Reques
 		timeLimitSec = 300
 	}
 
-	sess := &model.Session{
-		ID:           uuid.New().String(),
-		MapID:        req.MapID,
+	h.createSoloLike(w, &model.Session{
+		MapID:        m.ID,
 		GuideID:      middleware.GuideIDFromContext(r.Context()),
-		Code:         generateCode(6),
 		Phase:        model.PhaseWaiting,
 		CurrentRound: 0,
 		TimeLimitSec: timeLimitSec,
-		IsSolo:       true,
-		CreatedAt:    time.Now(),
-	}
-	if err := h.store.CreateSession(sess); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create session")
-		return
-	}
-
-	team := &model.Team{
-		ID:        uuid.New().String(),
-		SessionID: sess.ID,
-		Name:      "Solo",
-		Color:     "#3B82F6",
-	}
-	if err := h.store.CreateTeam(team); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create team")
-		return
-	}
-
-	player := &model.Player{
-		ID:        uuid.New().String(),
-		SessionID: sess.ID,
-		TeamID:    team.ID,
-		Name:      req.PlayerName,
-	}
-	if err := h.store.CreatePlayer(player); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create player")
-		return
-	}
-
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"session": sess,
-		"player":  player,
-		"team":    team,
-	})
+	}, "Solo", req.PlayerName)
 }
 
 // CreateDemoSession creates an unauthenticated single-player session against
@@ -327,18 +291,23 @@ func (h *SessionHandler) CreateDemoSession(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// GuideID="" marks this as a demo session (no guide owner)
-	sess := &model.Session{
-		ID:           uuid.New().String(),
+	h.createSoloLike(w, &model.Session{
 		MapID:        m.ID,
-		GuideID:      "",
-		Code:         generateCode(6),
+		GuideID:      "", // demo: no guide owner
 		Phase:        model.PhasePlaying,
 		CurrentRound: 1,
 		TimeLimitSec: 300,
-		IsSolo:       true,
-		CreatedAt:    time.Now(),
-	}
+	}, "You", req.PlayerName)
+}
+
+// createSoloLike persists sess (filling in ID/Code/IsSolo/CreatedAt), then
+// creates a single team and player, and writes the trio as the response.
+func (h *SessionHandler) createSoloLike(w http.ResponseWriter, sess *model.Session, teamName, playerName string) {
+	sess.ID = uuid.New().String()
+	sess.Code = generateCode(6)
+	sess.IsSolo = true
+	sess.CreatedAt = time.Now()
+
 	if err := h.store.CreateSession(sess); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create session")
 		return
@@ -347,7 +316,7 @@ func (h *SessionHandler) CreateDemoSession(w http.ResponseWriter, r *http.Reques
 	team := &model.Team{
 		ID:        uuid.New().String(),
 		SessionID: sess.ID,
-		Name:      "You",
+		Name:      teamName,
 		Color:     "#3B82F6",
 	}
 	if err := h.store.CreateTeam(team); err != nil {
@@ -359,7 +328,7 @@ func (h *SessionHandler) CreateDemoSession(w http.ResponseWriter, r *http.Reques
 		ID:        uuid.New().String(),
 		SessionID: sess.ID,
 		TeamID:    team.ID,
-		Name:      req.PlayerName,
+		Name:      playerName,
 	}
 	if err := h.store.CreatePlayer(player); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create player")

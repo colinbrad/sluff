@@ -34,6 +34,33 @@ type Round struct {
 	NoGoZones   []orb.Polygon `json:"no_go_zones,omitempty"`
 }
 
+// MarshalJSON serializes geometry fields as GeoJSON rather than raw orb arrays.
+func (r Round) MarshalJSON() ([]byte, error) {
+	noGo := make([]*geojson.Geometry, len(r.NoGoZones))
+	for i, z := range r.NoGoZones {
+		noGo[i] = geojson.NewGeometry(z)
+	}
+	return json.Marshal(struct {
+		ID          string              `json:"id"`
+		MapID       string              `json:"map_id"`
+		RoundNumber int                 `json:"round_number"`
+		Name        string              `json:"name"`
+		StartPoint  *geojson.Geometry   `json:"start_point"`
+		EndPoint    *geojson.Geometry   `json:"end_point"`
+		Corridor    *geojson.Geometry   `json:"corridor"`
+		NoGoZones   []*geojson.Geometry `json:"no_go_zones"`
+	}{
+		ID:          r.ID,
+		MapID:       r.MapID,
+		RoundNumber: r.RoundNumber,
+		Name:        r.Name,
+		StartPoint:  geojson.NewGeometry(r.StartPoint),
+		EndPoint:    geojson.NewGeometry(r.EndPoint),
+		Corridor:    geojson.NewGeometry(r.Corridor),
+		NoGoZones:   noGo,
+	})
+}
+
 // ValidateRound checks that a round has valid, non-zero start/end points,
 // that start and end are distinct, and that the corridor has at least 3 vertices.
 func ValidateRound(r *Round) error {
@@ -86,13 +113,9 @@ func RoundFromJSON(startPointJSON, endPointJSON, corridorJSON string) (orb.Point
 
 // NoGoZonesToJSON encodes a slice of polygons as a JSON array of GeoJSON geometries.
 func NoGoZonesToJSON(zones []orb.Polygon) string {
-	if len(zones) == 0 {
-		return "[]"
-	}
-	geoms := make([]json.RawMessage, len(zones))
+	geoms := make([]*geojson.Geometry, len(zones))
 	for i, z := range zones {
-		b, _ := geojson.NewGeometry(z).MarshalJSON()
-		geoms[i] = b
+		geoms[i] = geojson.NewGeometry(z)
 	}
 	b, _ := json.Marshal(geoms)
 	return string(b)
@@ -100,24 +123,20 @@ func NoGoZonesToJSON(zones []orb.Polygon) string {
 
 // NoGoZonesFromJSON decodes a JSON array of GeoJSON polygon geometries.
 func NoGoZonesFromJSON(s string) ([]orb.Polygon, error) {
-	if s == "" || s == "[]" {
+	if s == "" {
 		return nil, nil
 	}
-	var raws []json.RawMessage
-	if err := json.Unmarshal([]byte(s), &raws); err != nil {
+	var geoms []*geojson.Geometry
+	if err := json.Unmarshal([]byte(s), &geoms); err != nil {
 		return nil, fmt.Errorf("decode no-go zones: %w", err)
 	}
-	zones := make([]orb.Polygon, 0, len(raws))
-	for _, raw := range raws {
-		geom, err := geojson.UnmarshalGeometry(raw)
-		if err != nil {
-			return nil, fmt.Errorf("parse no-go zone geometry: %w", err)
-		}
-		poly, ok := geom.Geometry().(orb.Polygon)
+	zones := make([]orb.Polygon, len(geoms))
+	for i, g := range geoms {
+		poly, ok := g.Geometry().(orb.Polygon)
 		if !ok {
 			return nil, errors.New("expected Polygon geometry in no-go zones")
 		}
-		zones = append(zones, poly)
+		zones[i] = poly
 	}
 	return zones, nil
 }

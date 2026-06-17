@@ -15,12 +15,12 @@ import (
 
 // AuthHandler implements guide registration and login endpoints and issues JWTs.
 type AuthHandler struct {
-	store     store.Store
+	store     *store.SQLiteStore
 	jwtSecret string
 }
 
 // NewAuthHandler constructs an AuthHandler that signs tokens with jwtSecret.
-func NewAuthHandler(s store.Store, jwtSecret string) *AuthHandler {
+func NewAuthHandler(s *store.SQLiteStore, jwtSecret string) *AuthHandler {
 	return &AuthHandler{store: s, jwtSecret: jwtSecret}
 }
 

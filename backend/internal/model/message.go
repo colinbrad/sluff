@@ -1,21 +1,11 @@
 package model
 
-import (
-	"encoding/json"
-	"fmt"
-	"log/slog"
-)
+import "encoding/json"
 
-// SafeMarshal returns the JSON encoding of v for use as a WSMessage payload.
-// The well-typed payload structs in this package cannot legitimately fail to
-// marshal; if one ever does we log and substitute JSON null rather than
-// crashing the broadcasting goroutine.
-func SafeMarshal(v any) json.RawMessage {
-	b, err := json.Marshal(v)
-	if err != nil {
-		slog.Error("payload marshal failed", "err", err, "type", fmt.Sprintf("%T", v))
-		return json.RawMessage("null")
-	}
+// MustMarshal marshals v to JSON, discarding errors. The well-typed payload
+// structs in this package cannot fail to marshal.
+func MustMarshal(v any) json.RawMessage {
+	b, _ := json.Marshal(v)
 	return b
 }
 

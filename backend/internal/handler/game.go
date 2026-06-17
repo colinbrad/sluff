@@ -17,12 +17,12 @@ import (
 // GameHandler implements endpoints that advance game flow: starting rounds,
 // submitting routes, and fetching scores.
 type GameHandler struct {
-	store store.Store
+	store *store.SQLiteStore
 	hub   *ws.Hub
 }
 
 // NewGameHandler constructs a GameHandler backed by the given store and hub.
-func NewGameHandler(s store.Store, hub *ws.Hub) *GameHandler {
+func NewGameHandler(s *store.SQLiteStore, hub *ws.Hub) *GameHandler {
 	return &GameHandler{store: s, hub: hub}
 }
 
@@ -85,15 +85,13 @@ func (h *GameHandler) StartGame(w http.ResponseWriter, r *http.Request) {
 
 	// Broadcast round start to all connected players.
 	round := rounds[nextRound-1]
-	payload := roundToGeoJSON(&round)
-
 	h.hub.BroadcastToSession(sessionID, model.WSMessage{
 		Type:    model.MsgRoundStart,
-		Payload: safeMarshal(payload),
+		Payload: model.MustMarshal(round),
 	})
 	h.hub.BroadcastToSession(sessionID, model.WSMessage{
 		Type: model.MsgGameState,
-		Payload: safeMarshal(model.GameStatePayload{
+		Payload: model.MustMarshal(model.GameStatePayload{
 			Phase:         model.PhasePlaying,
 			CurrentRound:  nextRound,
 			TimeRemaining: sess.TimeLimitSec,
@@ -225,8 +223,7 @@ func (h *GameHandler) GetCurrentRound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	round := rounds[sess.CurrentRound-1]
-	writeJSON(w, http.StatusOK, roundToGeoJSON(&round))
+	writeJSON(w, http.StatusOK, rounds[sess.CurrentRound-1])
 }
 
 // DemoNextRound is the public, unauthenticated round advancement endpoint used
@@ -269,9 +266,8 @@ func (h *GameHandler) DemoNextRound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	round := rounds[nextRound-1]
 	writeJSON(w, http.StatusOK, map[string]any{
 		"session": sess,
-		"round":   roundToGeoJSON(&round),
+		"round":   rounds[nextRound-1],
 	})
 }

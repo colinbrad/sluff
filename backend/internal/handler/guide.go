@@ -23,11 +23,11 @@ func guideIDFromCtx(r *http.Request) string {
 
 // GuideHandler implements the authenticated map and round CRUD endpoints.
 type GuideHandler struct {
-	store store.Store
+	store *store.SQLiteStore
 }
 
 // NewGuideHandler constructs a GuideHandler backed by the given store.
-func NewGuideHandler(s store.Store) *GuideHandler {
+func NewGuideHandler(s *store.SQLiteStore) *GuideHandler {
 	return &GuideHandler{store: s}
 }
 
@@ -96,22 +96,7 @@ func (h *GuideHandler) GetMap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert orb geometries to GeoJSON format for frontend compatibility
-	roundsJSON := make([]any, len(m.Rounds))
-	for i, round := range m.Rounds {
-		roundsJSON[i] = roundToGeoJSON(&round)
-	}
-
-	mapJSON := map[string]any{
-		"id":          m.ID,
-		"name":        m.Name,
-		"description": m.Description,
-		"created_at":  m.CreatedAt,
-		"updated_at":  m.UpdatedAt,
-		"rounds":      roundsJSON,
-	}
-
-	writeJSON(w, http.StatusOK, mapJSON)
+	writeJSON(w, http.StatusOK, m)
 }
 
 // UpdateMap renames or re-describes a map owned by the authenticated guide.
@@ -248,7 +233,7 @@ func (h *GuideHandler) CreateRound(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return GeoJSON format for frontend consistency
-	writeJSON(w, http.StatusCreated, roundToGeoJSON(round))
+	writeJSON(w, http.StatusCreated, round)
 }
 
 // UpdateRound modifies an existing round; only fields present in the request
@@ -335,7 +320,7 @@ func (h *GuideHandler) UpdateRound(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return GeoJSON format for frontend consistency
-	writeJSON(w, http.StatusOK, roundToGeoJSON(existing))
+	writeJSON(w, http.StatusOK, existing)
 }
 
 // DeleteRound removes a round from a map owned by the authenticated guide.
@@ -364,38 +349,6 @@ func (h *GuideHandler) DeleteRound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// helpers
-
-// roundToGeoJSON serializes a Round's orb geometry fields to GeoJSON-compatible maps
-// for consumption by the frontend.
-func roundToGeoJSON(round *model.Round) map[string]any {
-	noGoGeo := make([]any, len(round.NoGoZones))
-	for i, zone := range round.NoGoZones {
-		noGoGeo[i] = polygonToGeoJSON(zone)
-	}
-	return map[string]any{
-		"id":           round.ID,
-		"map_id":       round.MapID,
-		"round_number": round.RoundNumber,
-		"name":         round.Name,
-		"start_point":  map[string]any{"type": "Point", "coordinates": []float64{round.StartPoint[0], round.StartPoint[1]}},
-		"end_point":    map[string]any{"type": "Point", "coordinates": []float64{round.EndPoint[0], round.EndPoint[1]}},
-		"corridor":     polygonToGeoJSON(round.Corridor),
-		"no_go_zones":  noGoGeo,
-	}
-}
-
-func polygonToGeoJSON(p orb.Polygon) map[string]any {
-	coords := make([][][]float64, len(p))
-	for i, ring := range p {
-		coords[i] = make([][]float64, len(ring))
-		for j, pt := range ring {
-			coords[i][j] = []float64{pt[0], pt[1]}
-		}
-	}
-	return map[string]any{"type": "Polygon", "coordinates": coords}
 }
 
 func parsePoint(raw json.RawMessage) (orb.Point, error) {
