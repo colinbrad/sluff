@@ -77,4 +77,5 @@ var alterMigrations = []string{
 	"ALTER TABLE rounds ADD COLUMN no_go_zones TEXT NOT NULL DEFAULT '[]'",
 	"ALTER TABLE game_maps ADD COLUMN guide_id TEXT REFERENCES guides(id)",
 	"ALTER TABLE sessions ADD COLUMN guide_id TEXT REFERENCES guides(id)",
+	"ALTER TABLE sessions ADD COLUMN round_ends_at DATETIME",
 }

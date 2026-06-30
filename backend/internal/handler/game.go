@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -9,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/colinbradley/sluff/internal/game"
+	"github.com/colinbradley/sluff/internal/middleware"
 	"github.com/colinbradley/sluff/internal/model"
 	"github.com/colinbradley/sluff/internal/store"
 	"github.com/colinbradley/sluff/internal/ws"
@@ -72,13 +75,23 @@ func (h *GameHandler) StartGame(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "failed to update session")
 			return
 		}
+		// Notify connected players the game is over so they leave the
+		// "waiting for guide" state.
+		h.hub.BroadcastToSession(sessionID, model.WSMessage{
+			Type: model.MsgGameState,
+			Payload: model.MustMarshal(model.GameStatePayload{
+				Phase:        model.PhaseFinished,
+				CurrentRound: sess.CurrentRound,
+			}),
+		})
 		writeJSON(w, http.StatusOK, sess)
 		return
 	}
 
 	sess.Phase = model.PhasePlaying
 	sess.CurrentRound = nextRound
-	if err := h.store.UpdateSession(sess); err != nil {
+	// Record the authoritative deadline; the ticker ends the round when it passes.
+	if err := h.store.StartRound(sessionID, nextRound, time.Now().Add(time.Duration(sess.TimeLimitSec)*time.Second)); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update session")
 		return
 	}
@@ -121,8 +134,10 @@ func (h *GameHandler) SubmitRoute(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "session not found")
 		return
 	}
-	if sess.Phase != model.PhasePlaying {
-		writeError(w, http.StatusBadRequest, "session is not in playing phase")
+	// Scoring is also accepted so clients can auto-submit their in-progress
+	// route when the round ends.
+	if sess.Phase != model.PhasePlaying && sess.Phase != model.PhaseScoring {
+		writeError(w, http.StatusBadRequest, "session is not accepting submissions")
 		return
 	}
 
@@ -181,6 +196,24 @@ func (h *GameHandler) SubmitRoute(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.CreateTeamRoute(route); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to save route")
 		return
+	}
+
+	// Multiplayer live-scoring broadcasts. Solo/demo have no WS clients.
+	if !sess.IsSolo {
+		if sess.Phase == model.PhaseScoring {
+			// Round already ended; stream updated scores as each (auto-)submission lands.
+			h.broadcastScores(sessionID, sess)
+		} else {
+			// During play, announce progress without leaking the route, then end the
+			// round early once every team with players has submitted.
+			h.hub.BroadcastToSession(sessionID, model.WSMessage{
+				Type:    model.MsgTeamSubmitted,
+				Payload: model.MustMarshal(model.TeamSubmittedPayload{TeamID: req.TeamID}),
+			})
+			if routes, err := h.store.GetRoutesByRound(roundID); err == nil && allTeamsSubmitted(sess, routes) {
+				h.endRound(sessionID)
+			}
+		}
 	}
 
 	writeJSON(w, http.StatusCreated, route)
@@ -270,4 +303,114 @@ func (h *GameHandler) DemoNextRound(w http.ResponseWriter, r *http.Request) {
 		"session": sess,
 		"round":   rounds[nextRound-1],
 	})
+}
+
+// EndRound lets the guide end the current round early and reveal scores.
+func (h *GameHandler) EndRound(w http.ResponseWriter, r *http.Request) {
+	sessionID := chi.URLParam(r, "sessionID")
+
+	sess, err := h.store.GetSession(sessionID)
+	if err != nil || sess == nil {
+		writeError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	if sess.GuideID != middleware.GuideIDFromContext(r.Context()) {
+		writeError(w, http.StatusForbidden, "not your session")
+		return
+	}
+
+	h.endRound(sessionID)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// RunRoundTicker ends multiplayer rounds whose deadline has passed. It runs as
+// a single goroutine until ctx is cancelled.
+func (h *GameHandler) RunRoundTicker(ctx context.Context) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			ids, err := h.store.ExpiredPlayingSessions(time.Now())
+			if err != nil {
+				slog.Error("round ticker query failed", "err", err)
+				continue
+			}
+			for _, id := range ids {
+				h.endRound(id)
+			}
+		}
+	}
+}
+
+// endRound transitions a playing session to scoring and reveals the scores so
+// far. Idempotent: the ticker, the guide action, and the final submission can
+// all call it, but only the caller that flips the phase row broadcasts.
+func (h *GameHandler) endRound(sessionID string) {
+	ended, err := h.store.EndRoundIfPlaying(sessionID)
+	if err != nil || !ended {
+		return
+	}
+	sess, err := h.store.GetSession(sessionID)
+	if err != nil || sess == nil {
+		return
+	}
+	h.hub.BroadcastToSession(sessionID, model.WSMessage{Type: model.MsgRoundEnd})
+	h.hub.BroadcastToSession(sessionID, model.WSMessage{
+		Type: model.MsgGameState,
+		Payload: model.MustMarshal(model.GameStatePayload{
+			Phase:        model.PhaseScoring,
+			CurrentRound: sess.CurrentRound,
+		}),
+	})
+	h.broadcastScores(sessionID, sess)
+}
+
+// broadcastScores sends the per-team score breakdown for the session's current
+// round to every connected client.
+func (h *GameHandler) broadcastScores(sessionID string, sess *model.Session) {
+	rounds, err := h.store.GetRoundsByMap(sess.MapID)
+	if err != nil || sess.CurrentRound < 1 || sess.CurrentRound > len(rounds) {
+		return
+	}
+	routes, err := h.store.GetRoutesByRound(rounds[sess.CurrentRound-1].ID)
+	if err != nil {
+		return
+	}
+	entries := make([]model.TeamScoreEntry, 0, len(routes))
+	for _, rt := range routes {
+		if rt.Details != nil {
+			entries = append(entries, model.TeamScoreEntry{TeamID: rt.TeamID, Score: *rt.Details})
+		}
+	}
+	h.hub.BroadcastToSession(sessionID, model.WSMessage{
+		Type:    model.MsgScores,
+		Payload: model.MustMarshal(model.ScoresPayload{TeamScores: entries}),
+	})
+}
+
+// allTeamsSubmitted reports whether every team with at least one player has
+// submitted for the round. Empty teams do not block the early round end.
+func allTeamsSubmitted(sess *model.Session, routes []model.TeamRoute) bool {
+	withPlayers := map[string]bool{}
+	for _, p := range sess.Players {
+		if p.TeamID != "" {
+			withPlayers[p.TeamID] = true
+		}
+	}
+	if len(withPlayers) == 0 {
+		return false
+	}
+	submitted := map[string]bool{}
+	for _, rt := range routes {
+		submitted[rt.TeamID] = true
+	}
+	for tid := range withPlayers {
+		if !submitted[tid] {
+			return false
+		}
+	}
+	return true
 }

@@ -9,6 +9,7 @@ import type {
   CursorUpdatePayload,
   DrawingUpdateFromServer,
   ScoresPayload,
+  TeamSubmittedPayload,
 } from '../../types/messages';
 import * as api from '../../services/api';
 import { addRoundMarkers, addNoGoZoneLayers, removeNoGoZoneLayers } from '../../utils/mapUtils';
@@ -57,6 +58,7 @@ export default function GameView() {
   const [slopeShading, setSlopeShading] = useState(false);
   const [demoStep, setDemoStep] = useState<DemoStep>('welcome');
   const [hasRoute, setHasRoute] = useState(false);
+  const [submittedTeams, setSubmittedTeams] = useState<Set<string>>(new Set());
 
   // Reset game store when entering a new session
   useEffect(() => {
@@ -76,6 +78,9 @@ export default function GameView() {
 
   const isSolo = session?.is_solo ?? false;
   const isGuide = !!guide && session?.guide_id === guide.id;
+  const teamsWithPlayers = new Set(
+    (session?.players ?? []).filter((p) => p.team_id).map((p) => p.team_id),
+  ).size;
 
   useEffect(() => {
     if (isDemo && hasRoute && demoStep === 'drawing') {
@@ -104,9 +109,33 @@ export default function GameView() {
             }
           });
         }
+      } else if (s.phase === 'scoring' && s.current_round > 0) {
+        // Reconnecting mid-scoring: restore the round and its results.
+        api.getMap(s.map_id).then((m) => {
+          const round = m.rounds?.[s.current_round - 1];
+          if (!round) return;
+          setCurrentRound(round);
+          setPhase('scoring');
+          api.getScores(sessionId, round.id).then((routes) => {
+            setRouteResults(routes);
+            setTeamScores(
+              routes.flatMap((r) => (r.details ? [{ team_id: r.team_id, score: r.details }] : [])),
+            );
+            setShowScores(true);
+          });
+        });
       }
     });
-  }, [sessionId, isDemo, setSession, setCurrentRound, setPhase, setTimeRemaining]);
+  }, [
+    sessionId,
+    isDemo,
+    setSession,
+    setCurrentRound,
+    setPhase,
+    setTimeRemaining,
+    setRouteResults,
+    setTeamScores,
+  ]);
 
   // WebSocket connection (skip for solo)
   useEffect(() => {
@@ -133,6 +162,10 @@ export default function GameView() {
           setPhase('playing');
           setShowScores(false);
           setSubmitted(false);
+          setHasRoute(false);
+          setTeamScores([]);
+          setRouteResults([]);
+          setSubmittedTeams(new Set());
           break;
         }
         case 'cursor_update': {
@@ -149,15 +182,23 @@ export default function GameView() {
           break;
         }
         case 'scores': {
+          // The review screen is opened by game_state(scoring); this just
+          // fills in the (progressively revealed) results.
           const scores = msg.payload as ScoresPayload;
           setTeamScores(scores.team_scores);
-          // Fetch full route data (with paths) for map display
-          if (sessionId && currentRound?.id) {
-            api.getScores(sessionId, currentRound.id).then((routes) => {
+          // Fetch full route data (with paths) for map display. Read the round
+          // via ref since this closure was created at connect time.
+          const round = currentRoundRef.current;
+          if (sessionId && round?.id) {
+            api.getScores(sessionId, round.id).then((routes) => {
               setRouteResults(routes);
             });
           }
-          setShowScores(true);
+          break;
+        }
+        case 'team_submitted': {
+          const { team_id } = msg.payload as TeamSubmittedPayload;
+          setSubmittedTeams((prev) => new Set(prev).add(team_id));
           break;
         }
         case 'round_end':
@@ -305,7 +346,10 @@ export default function GameView() {
   );
 
   const handleSubmit = async () => {
-    if (!sessionId || !currentRound || !player || submitted) return;
+    // Read the round through the ref so the WS auto-submit closure (which
+    // captured an earlier render) still sees the active round.
+    const round = currentRoundRef.current;
+    if (!sessionId || !round || !player || submitted) return;
 
     const draw = drawRef.current;
     if (!draw) return;
@@ -319,14 +363,14 @@ export default function GameView() {
     try {
       await api.submitRoute(
         sessionId,
-        currentRound.id,
+        round.id,
         player.team_id,
         latestLine.geometry as GeoJSON.Geometry,
       );
       setSubmitted(true);
 
       if (isSolo) {
-        const scores = await api.getScores(sessionId, currentRound.id);
+        const scores = await api.getScores(sessionId, round.id);
         setRouteResults(scores);
         const mappedScores = scores.flatMap((r) =>
           r.details ? [{ team_id: r.team_id, score: r.details }] : [],
@@ -389,8 +433,14 @@ export default function GameView() {
       } catch {
         // Round advance errors are non-fatal
       }
-    } else {
-      setShowScores(false);
+    } else if (isGuide && sessionId) {
+      // Multiplayer: only the guide advances. The round_start (or finished)
+      // broadcast moves every client, including the guide, to the next round.
+      try {
+        await api.startGame(sessionId);
+      } catch {
+        // non-fatal
+      }
     }
   };
 
@@ -420,6 +470,7 @@ export default function GameView() {
         teams={session?.teams || []}
         currentRound={currentRound}
         onNextRound={handleScoreContinue}
+        showAdvance={isSolo || isGuide}
       />
     );
   }
@@ -461,7 +512,7 @@ export default function GameView() {
           onToggleSlope={() => setSlopeShading((v) => !v)}
         />
 
-        {isGuide && sessionId && (
+        {isGuide && !isSolo && sessionId && (
           <GuideSessionControls
             sessionId={sessionId}
             players={session?.players ?? []}
@@ -469,7 +520,7 @@ export default function GameView() {
             routeResults={routeResults}
             currentRound={currentRound}
             phase={phase ?? 'waiting'}
-            onAdvanceRound={handleScoreContinue}
+            onEndRound={() => api.endRound(sessionId)}
             onRefreshSession={() => {
               api.getSession(sessionId).then((s) => setSession(s));
             }}
@@ -492,7 +543,7 @@ export default function GameView() {
         {submitted && phase === 'playing' && !isSolo && (
           <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-10">
             <div className="px-4 sm:px-6 py-3 bg-white rounded-lg shadow-lg text-green-600 font-semibold text-sm sm:text-base text-center">
-              Submitted! Waiting for other teams...
+              Submitted! {submittedTeams.size}/{teamsWithPlayers} teams in.
             </div>
           </div>
         )}

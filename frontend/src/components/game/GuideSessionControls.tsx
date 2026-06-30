@@ -9,7 +9,7 @@ interface GuideSessionControlsProps {
   routeResults: TeamRoute[];
   currentRound: Round | null;
   phase: string;
-  onAdvanceRound: () => void;
+  onEndRound: () => void;
   onRefreshSession: () => void;
 }
 
@@ -20,7 +20,7 @@ export default function GuideSessionControls({
   routeResults,
   currentRound,
   phase,
-  onAdvanceRound,
+  onEndRound,
   onRefreshSession,
 }: GuideSessionControlsProps) {
   const [open, setOpen] = useState(false);
@@ -53,10 +53,10 @@ export default function GuideSessionControls({
     }
   };
 
-  const handleAdvance = async () => {
+  const handleEndRound = async () => {
     setBusy(true);
     try {
-      await onAdvanceRound();
+      await onEndRound();
     } finally {
       setBusy(false);
     }
@@ -76,16 +76,18 @@ export default function GuideSessionControls({
       {/* Panel */}
       {open && (
         <div className="mt-1 w-64 bg-gray-900/95 backdrop-blur-sm rounded-lg shadow-xl border border-gray-700 text-sm overflow-hidden">
-          {/* Force next round */}
-          <div className="p-3 border-b border-gray-700">
-            <button
-              onClick={handleAdvance}
-              disabled={busy || phase === 'finished'}
-              className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 font-semibold transition-colors"
-            >
-              Force Next Round
-            </button>
-          </div>
+          {/* End round early */}
+          {phase === 'playing' && (
+            <div className="p-3 border-b border-gray-700">
+              <button
+                onClick={handleEndRound}
+                disabled={busy}
+                className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 font-semibold transition-colors"
+              >
+                End Round &amp; Reveal Scores
+              </button>
+            </div>
+          )}
 
           {/* Players — kick */}
           {players.length > 0 && (

@@ -1,24 +1,8 @@
-import type { GamePhase, Player, Round, ScoreDetails } from './game';
+import type { GamePhase, ScoreDetails } from './game';
 
 export interface WSMessage {
   type: string;
   payload: unknown;
-}
-
-// Client -> Server
-export interface CursorMovePayload {
-  lat: number;
-  lng: number;
-}
-
-export interface DrawingUpdatePayload {
-  team_id: string;
-  path: GeoJSON.LineString;
-}
-
-export interface DrawingSubmitPayload {
-  team_id: string;
-  path: GeoJSON.LineString;
 }
 
 // Server -> Client
@@ -40,12 +24,6 @@ export interface GameStatePayload {
   time_remaining: number;
 }
 
-export interface PlayerEventPayload {
-  player: Player;
-}
-
-export type RoundStartPayload = Round;
-
 export interface ScoresPayload {
   team_scores: Array<{
     team_id: string;
@@ -53,6 +31,6 @@ export interface ScoresPayload {
   }>;
 }
 
-export interface ErrorPayload {
-  message: string;
+export interface TeamSubmittedPayload {
+  team_id: string;
 }

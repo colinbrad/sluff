@@ -543,20 +543,6 @@ func TestStore_Routes(t *testing.T) {
 		}
 	})
 
-	t.Run("UpdateTeamRouteScore changes score and details", func(t *testing.T) {
-		newDetails := model.ScoreDetails{FinalScore: 950.0, ConnectsStart: true, ConnectsEnd: true}
-		if err := s.UpdateTeamRouteScore(route.ID, 950.0, newDetails.ToJSON()); err != nil {
-			t.Fatalf("UpdateTeamRouteScore: %v", err)
-		}
-		got, _ := s.GetTeamRoute(r.ID, team.ID)
-		if *got.Score != 950.0 {
-			t.Errorf("updated score: want 950.0, got %f", *got.Score)
-		}
-		if got.Details.FinalScore != 950.0 {
-			t.Errorf("updated details.final_score: want 950.0, got %f", got.Details.FinalScore)
-		}
-	})
-
 	t.Run("GetRoutesByRound returns empty for unknown round", func(t *testing.T) {
 		routes, err := s.GetRoutesByRound("no-such-round")
 		if err != nil {
@@ -566,4 +552,62 @@ func TestStore_Routes(t *testing.T) {
 			t.Errorf("expected empty, got %d routes", len(routes))
 		}
 	})
+}
+
+func TestRoundLifecycle(t *testing.T) {
+	s := newTestStore(t)
+	m := newMap("rl")
+	if err := s.CreateMap(m); err != nil {
+		t.Fatalf("CreateMap: %v", err)
+	}
+
+	mp := newSession(m.ID, "sess-mp")
+	if err := s.CreateSession(mp); err != nil {
+		t.Fatalf("CreateSession: %v", err)
+	}
+	solo := newSession(m.ID, "sess-solo")
+	solo.Code = "SOLOCD"
+	solo.IsSolo = true
+	if err := s.CreateSession(solo); err != nil {
+		t.Fatalf("CreateSession solo: %v", err)
+	}
+
+	// A future deadline is not yet expired.
+	if err := s.StartRound(mp.ID, 1, time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("StartRound: %v", err)
+	}
+	if ids, err := s.ExpiredPlayingSessions(time.Now()); err != nil || len(ids) != 0 {
+		t.Fatalf("expected no expired sessions, got %v (err %v)", ids, err)
+	}
+
+	// A past deadline expires the multiplayer session; the solo one is excluded
+	// even though its deadline has also passed.
+	if err := s.StartRound(mp.ID, 1, time.Now().Add(-time.Minute)); err != nil {
+		t.Fatalf("StartRound past: %v", err)
+	}
+	if err := s.StartRound(solo.ID, 1, time.Now().Add(-time.Minute)); err != nil {
+		t.Fatalf("StartRound solo: %v", err)
+	}
+	ids, err := s.ExpiredPlayingSessions(time.Now())
+	if err != nil {
+		t.Fatalf("ExpiredPlayingSessions: %v", err)
+	}
+	if len(ids) != 1 || ids[0] != mp.ID {
+		t.Fatalf("expected [%s], got %v", mp.ID, ids)
+	}
+
+	// EndRoundIfPlaying transitions exactly once; concurrent callers converge.
+	ended, err := s.EndRoundIfPlaying(mp.ID)
+	if err != nil || !ended {
+		t.Fatalf("first EndRoundIfPlaying: ended=%v err=%v", ended, err)
+	}
+	ended, err = s.EndRoundIfPlaying(mp.ID)
+	if err != nil || ended {
+		t.Fatalf("second EndRoundIfPlaying should be a no-op: ended=%v err=%v", ended, err)
+	}
+
+	// Once scoring, the session is no longer reported as expired.
+	if ids, _ := s.ExpiredPlayingSessions(time.Now()); len(ids) != 0 {
+		t.Fatalf("expected no expired after scoring, got %v", ids)
+	}
 }

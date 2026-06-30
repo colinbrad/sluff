@@ -46,7 +46,6 @@ type Player struct {
 	SessionID string `json:"session_id"`
 	TeamID    string `json:"team_id"`
 	Name      string `json:"name"`
-	IsOnline  bool   `json:"is_online"`
 }
 
 // TeamRoute is a team's submitted GeoJSON LineString for a round, along with its score.

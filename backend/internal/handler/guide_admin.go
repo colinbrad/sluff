@@ -46,7 +46,7 @@ func (h *GuideAdminHandler) KickPlayer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.hub.BroadcastToSession(sessionID, model.WSMessage{
-		Type:    "player_left",
+		Type:    model.MsgPlayerLeft,
 		Payload: model.MustMarshal(map[string]string{"player_id": playerID}),
 	})
 

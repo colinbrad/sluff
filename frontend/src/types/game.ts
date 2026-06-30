@@ -52,7 +52,6 @@ export interface Player {
   session_id: string;
   team_id: string;
   name: string;
-  is_online: boolean;
 }
 
 export interface TeamRoute {

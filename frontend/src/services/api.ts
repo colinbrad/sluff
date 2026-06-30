@@ -148,6 +148,9 @@ export const joinTeam = (
 export const startGame = (sessionId: string): Promise<Session> =>
   authRequest<Session>(`/sessions/${sessionId}/start`, { method: 'POST' });
 
+export const endRound = (sessionId: string): Promise<void> =>
+  authRequest<void>(`/sessions/${sessionId}/end-round`, { method: 'POST' });
+
 export const submitRoute = (
   sessionId: string,
   roundId: string,

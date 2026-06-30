@@ -143,7 +143,6 @@ describe('playerStore', () => {
       session_id: 's1',
       team_id: 't1',
       name: 'Test Player',
-      is_online: true,
     };
     usePlayerStore.getState().setPlayer(player);
     expect(usePlayerStore.getState().player).toEqual(player);
@@ -152,7 +151,7 @@ describe('playerStore', () => {
   it('setPlayer to null clears player', () => {
     usePlayerStore
       .getState()
-      .setPlayer({ id: 'p1', session_id: 's1', team_id: 't1', name: 'Test', is_online: true });
+      .setPlayer({ id: 'p1', session_id: 's1', team_id: 't1', name: 'Test' });
     usePlayerStore.getState().setPlayer(null);
     expect(usePlayerStore.getState().player).toBeNull();
   });

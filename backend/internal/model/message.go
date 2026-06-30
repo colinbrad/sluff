@@ -19,20 +19,18 @@ type WSMessage struct {
 const (
 	MsgCursorMove    = "cursor_move"
 	MsgDrawingUpdate = "drawing_update"
-	MsgDrawingSubmit = "drawing_submit"
 	MsgPing          = "ping"
 )
 
 // Server-to-client message type constants.
 const (
-	MsgPlayerJoined = "player_joined"
-	MsgPlayerLeft   = "player_left"
-	MsgCursorUpdate = "cursor_update"
-	MsgGameState    = "game_state"
-	MsgRoundStart   = "round_start"
-	MsgRoundEnd     = "round_end"
-	MsgScores       = "scores"
-	MsgError        = "error"
+	MsgPlayerLeft    = "player_left"
+	MsgCursorUpdate  = "cursor_update"
+	MsgGameState     = "game_state"
+	MsgRoundStart    = "round_start"
+	MsgRoundEnd      = "round_end"
+	MsgScores        = "scores"
+	MsgTeamSubmitted = "team_submitted"
 )
 
 // CursorMovePayload is sent by clients to share their cursor position.
@@ -62,11 +60,6 @@ type GameStatePayload struct {
 	TimeRemaining int       `json:"time_remaining"`
 }
 
-// PlayerEventPayload wraps a player record for join/leave broadcasts.
-type PlayerEventPayload struct {
-	Player Player `json:"player"`
-}
-
 // ScoresPayload is broadcast at the end of a round with per-team results.
 type ScoresPayload struct {
 	TeamScores []TeamScoreEntry `json:"team_scores"`
@@ -78,7 +71,8 @@ type TeamScoreEntry struct {
 	Score  ScoreDetails `json:"score"`
 }
 
-// ErrorPayload carries a human-readable error message to the client.
-type ErrorPayload struct {
-	Message string `json:"message"`
+// TeamSubmittedPayload announces (without leaking the route) that a team has
+// submitted for the current round, driving the submission-progress indicator.
+type TeamSubmittedPayload struct {
+	TeamID string `json:"team_id"`
 }

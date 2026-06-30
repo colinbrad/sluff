@@ -44,7 +44,7 @@ func New(ctx context.Context, s *store.SQLiteStore, cfg *config.Config) *Server 
 	go srv.hub.Run()
 
 	srv.setupMiddleware()
-	srv.setupRoutes()
+	srv.setupRoutes(ctx)
 	return srv
 }
 
@@ -69,13 +69,15 @@ func (s *Server) setupMiddleware() {
 	})
 }
 
-func (s *Server) setupRoutes() {
+func (s *Server) setupRoutes(ctx context.Context) {
 	guideH := handler.NewGuideHandler(s.store)
 	sessionH := handler.NewSessionHandler(s.store)
 	gameH := handler.NewGameHandler(s.store, s.hub)
 	wsH := handler.NewWSHandler(s.store, s.hub)
 	authH := handler.NewAuthHandler(s.store, s.cfg.JWTSecret)
 	adminH := handler.NewGuideAdminHandler(s.store, s.hub)
+
+	go gameH.RunRoundTicker(ctx)
 
 	guideAuth := middleware.GuideAuth(s.cfg.JWTSecret)
 
@@ -120,6 +122,7 @@ func (s *Server) setupRoutes() {
 
 		// Guide-only: game control
 		r.With(guideAuth).Post("/{sessionID}/start", gameH.StartGame)
+		r.With(guideAuth).Post("/{sessionID}/end-round", gameH.EndRound)
 		r.With(guideAuth).Delete("/{sessionID}/players/{playerID}", adminH.KickPlayer)
 		r.With(guideAuth).Delete("/{sessionID}/rounds/{roundID}/routes/{teamID}", adminH.ClearRoute)
 

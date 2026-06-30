@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	_ "modernc.org/sqlite" // registers the sqlite driver with database/sql
 	"golang.org/x/crypto/bcrypt"
+	_ "modernc.org/sqlite" // registers the sqlite driver with database/sql
 
 	"github.com/google/uuid"
 
@@ -116,17 +116,6 @@ func (s *SQLiteStore) CreateGuide(g *model.Guide) error {
 func (s *SQLiteStore) GetGuideByUsername(username string) (*model.Guide, error) {
 	g := &model.Guide{}
 	err := s.db.QueryRow("SELECT id, username, password_hash, created_at FROM guides WHERE username = ?", username).
-		Scan(&g.ID, &g.Username, &g.PasswordHash, &g.CreatedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	return g, err
-}
-
-// GetGuideByID returns a guide by ID, or (nil, nil) if not found.
-func (s *SQLiteStore) GetGuideByID(id string) (*model.Guide, error) {
-	g := &model.Guide{}
-	err := s.db.QueryRow("SELECT id, username, password_hash, created_at FROM guides WHERE id = ?", id).
 		Scan(&g.ID, &g.Username, &g.PasswordHash, &g.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -414,6 +403,54 @@ func (s *SQLiteStore) UpdateSession(sess *model.Session) error {
 	return err
 }
 
+// StartRound moves a session into the playing phase for the given round number
+// and records the authoritative deadline by which the round must end.
+func (s *SQLiteStore) StartRound(sessionID string, round int, endsAt time.Time) error {
+	_, err := s.db.Exec(
+		"UPDATE sessions SET phase = ?, current_round = ?, round_ends_at = ? WHERE id = ?",
+		model.PhasePlaying, round, endsAt, sessionID,
+	)
+	return err
+}
+
+// EndRoundIfPlaying atomically transitions a session from playing to scoring.
+// It reports whether this call performed the transition, so concurrent callers
+// (timer ticker, guide action, final submission) can converge on one round end.
+func (s *SQLiteStore) EndRoundIfPlaying(sessionID string) (bool, error) {
+	res, err := s.db.Exec(
+		"UPDATE sessions SET phase = ? WHERE id = ? AND phase = ?",
+		model.PhaseScoring, sessionID, model.PhasePlaying,
+	)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// ExpiredPlayingSessions returns the IDs of multiplayer sessions still in the
+// playing phase whose round deadline has passed.
+func (s *SQLiteStore) ExpiredPlayingSessions(now time.Time) ([]string, error) {
+	rows, err := s.db.Query(
+		"SELECT id FROM sessions WHERE phase = ? AND is_solo = 0 AND round_ends_at IS NOT NULL AND round_ends_at < ?",
+		model.PhasePlaying, now,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 // --- Teams ---
 
 // CreateTeam inserts a new team row.
@@ -561,12 +598,6 @@ func (s *SQLiteStore) GetRoutesByRound(roundID string) ([]model.TeamRoute, error
 		routes = append(routes, r)
 	}
 	return routes, rows.Err()
-}
-
-// UpdateTeamRouteScore overwrites the score and details of a stored route.
-func (s *SQLiteStore) UpdateTeamRouteScore(id string, score float64, details string) error {
-	_, err := s.db.Exec("UPDATE team_routes SET score = ?, details = ? WHERE id = ?", score, details, id)
-	return err
 }
 
 // DeleteTeamRoute removes a stored team route, allowing resubmission.

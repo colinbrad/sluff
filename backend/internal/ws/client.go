@@ -15,7 +15,6 @@ import (
 
 const (
 	writeWait  = 10 * time.Second
-	pongWait   = 60 * time.Second
 	pingPeriod = 30 * time.Second
 	maxMsgSize = 64 * 1024 // 64KB
 )

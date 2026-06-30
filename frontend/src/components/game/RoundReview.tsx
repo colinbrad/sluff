@@ -12,6 +12,7 @@ interface RoundReviewProps {
   teams: Team[];
   currentRound: Round | null;
   onNextRound: () => void;
+  showAdvance: boolean;
 }
 
 export default function RoundReview({
@@ -20,6 +21,7 @@ export default function RoundReview({
   teams,
   currentRound,
   onNextRound,
+  showAdvance,
 }: RoundReviewProps) {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -105,12 +107,16 @@ export default function RoundReview({
       {/* Header */}
       <div className="px-3 py-2 sm:px-4 sm:py-3 bg-gray-800 border-b border-gray-700 flex items-center justify-between">
         <h1 className="text-lg sm:text-xl font-bold text-white">Round Results</h1>
-        <button
-          onClick={onNextRound}
-          className="px-4 py-2 sm:px-6 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-colors text-sm sm:text-base"
-        >
-          Next Round
-        </button>
+        {showAdvance ? (
+          <button
+            onClick={onNextRound}
+            className="px-4 py-2 sm:px-6 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-colors text-sm sm:text-base"
+          >
+            Next Round
+          </button>
+        ) : (
+          <span className="text-sm text-gray-400">Waiting for the guide…</span>
+        )}
       </div>
 
       {/* Main content: stacked on mobile, side-by-side on desktop */}
@@ -226,12 +232,14 @@ export default function RoundReview({
           </div>
 
           {/* Mobile-only bottom button (easier to reach than header) */}
-          <button
-            onClick={onNextRound}
-            className="md:hidden w-full mt-4 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-colors"
-          >
-            Next Round
-          </button>
+          {showAdvance && (
+            <button
+              onClick={onNextRound}
+              className="md:hidden w-full mt-4 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-colors"
+            >
+              Next Round
+            </button>
+          )}
         </div>
       </div>
     </div>
